@@ -10,7 +10,7 @@
 | `internal/screen/screen.go` | 底层屏幕输出 | ❌ 不动 |
 ```
 
-## micromd 渲染后的表格在这里
+## microneo 渲染后的表格在这里
 
 
 | 模块 | 职责 | 我们要改？ |
