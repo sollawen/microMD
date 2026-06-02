@@ -437,6 +437,17 @@ func (w *BufWindow) displayBuffer() {
 	tabsize := util.IntOpt(b.Settings["tabsize"])
 	colorcolumn := util.IntOpt(b.Settings["colorcolumn"])
 
+	// === New: Detect tables in visible range ===
+	var tableBlocks []TableBlock
+	if b.Settings["mdtablealign"].(bool) {
+		visibleStart := w.StartLine.Line
+		visibleEnd := w.StartLine.Line + w.bufHeight
+		if visibleEnd >= b.LinesNum() {
+			visibleEnd = b.LinesNum() - 1
+		}
+		tableBlocks = DetectTables(b.LineBytes, visibleStart, visibleEnd, b.LinesNum())
+	}
+
 	// this represents the current draw position
 	// within the current window
 	vloc := buffer.Loc{X: 0, Y: 0}
@@ -505,6 +516,15 @@ func (w *BufWindow) displayBuffer() {
 			}
 		} else {
 			vloc.X = w.gutterOffset
+		}
+
+		// === New: Determine if current line is a table and init padding tracker ===
+		var tablePad *tablePadding
+		if tableBlock := findTableBlock(tableBlocks, bloc.Y); tableBlock != nil && w.StartCol == 0 {
+			tablePad = &tablePadding{
+				colWidths:   tableBlock.ColWidths,
+				isSeparator: isSeparatorLine(trimLeadingWhitespace(b.LineBytes(bloc.Y))),
+			}
 		}
 
 		bline := b.LineBytes(bloc.Y)
@@ -760,7 +780,7 @@ func (w *BufWindow) displayBuffer() {
 				}
 
 				// We either stop or we wrap to draw the word in the next line
-				if !softwrap {
+				if !softwrap || tablePad != nil {
 					break
 				} else {
 					vloc.Y++
@@ -772,6 +792,29 @@ func (w *BufWindow) displayBuffer() {
 			}
 
 			for _, r := range word {
+				// ===== New: Table cell padding injection =====
+			if tablePad != nil {
+				if action := tablePad.ProcessRune(r.r, r.width); action != nil {
+					// Padding style: inherit cursor-line background
+					padStyle := config.DefStyle
+					for _, c := range cursors {
+						if b.Settings["cursorline"].(bool) && w.active &&
+							!c.HasSelection() && c.Y == bloc.Y {
+							if s, ok := config.Colorscheme["cursor-line"]; ok {
+								fg, _, _ := s.Decompose()
+								padStyle = padStyle.Background(fg)
+							}
+							break
+						}
+					}
+					for i := 0; i < action.Count; i++ {
+						if vloc.X < maxWidth {
+							screen.SetContent(w.X+vloc.X, w.Y+vloc.Y, action.Char, nil, padStyle)
+							vloc.X++
+						}
+					}
+				}
+			}
 				drawrune, drawstyle, preservebg := getRuneStyle(r.r, r.style, 0, linex, false)
 				draw(drawrune, r.combc, drawstyle, true, true, preservebg)
 
@@ -792,7 +835,7 @@ func (w *BufWindow) displayBuffer() {
 
 			// If we reach the end of the window then we either stop or we wrap for softwrap
 			if vloc.X >= maxWidth {
-				if !softwrap {
+				if !softwrap || tablePad != nil {
 					break
 				} else {
 					vloc.Y++

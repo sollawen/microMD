@@ -24,17 +24,17 @@ endif
 build: generate build-quick
 
 build-quick:
-	CGO_ENABLED=$(CGO_ENABLED) go build -trimpath -ldflags "-s -w $(GOVARS) $(ADDITIONAL_GO_LINKER_FLAGS)" ./cmd/micro
+	CGO_ENABLED=$(CGO_ENABLED) go build -o micromd -trimpath -ldflags "-s -w $(GOVARS) $(ADDITIONAL_GO_LINKER_FLAGS)" ./cmd/micro
 
 build-dbg:
-	CGO_ENABLED=$(CGO_ENABLED) go build -trimpath -ldflags "$(ADDITIONAL_GO_LINKER_FLAGS) $(DEBUGVAR)" ./cmd/micro
+	CGO_ENABLED=$(CGO_ENABLED) go build -o micromd -trimpath -ldflags "$(ADDITIONAL_GO_LINKER_FLAGS) $(DEBUGVAR)" ./cmd/micro
 
 build-tags: fetch-tags build
 
 build-all: build
 
 install: generate
-	go install -ldflags "-s -w $(GOVARS) $(ADDITIONAL_GO_LINKER_FLAGS)" ./cmd/micro
+	go build -o $(GOBIN)/micromd -ldflags "-s -w $(GOVARS) $(ADDITIONAL_GO_LINKER_FLAGS)" ./cmd/micro
 
 install-all: install
 
@@ -75,4 +75,4 @@ bench-compare:
 	benchstat -alpha 0.15 benchmark_results_baseline benchmark_results
 
 clean:
-	rm -f micro
+	rm -f micromd

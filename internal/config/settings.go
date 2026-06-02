@@ -76,6 +76,7 @@ var defaultCommonSettings = map[string]any{
 	"keepautoindent":  false,
 	"matchbrace":      true,
 	"matchbraceleft":  true,
+	"mdtablealign":    true,
 	"matchbracestyle": "underline",
 	"mkparents":       false,
 	"pageoverlap":     float64(2),

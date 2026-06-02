@@ -1,7 +1,9 @@
 .DS_Store
+友军/
 
 micro
 micro.exe
+micromd
 !cmd/micro
 binaries/
 tmp.sh
