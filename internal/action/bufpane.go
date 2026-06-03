@@ -9,6 +9,7 @@ import (
 	"github.com/micro-editor/micro/v2/internal/buffer"
 	"github.com/micro-editor/micro/v2/internal/config"
 	"github.com/micro-editor/micro/v2/internal/display"
+	"github.com/micro-editor/micro/v2/internal/md"
 	ulua "github.com/micro-editor/micro/v2/internal/lua"
 	"github.com/micro-editor/micro/v2/internal/screen"
 	"github.com/micro-editor/micro/v2/internal/util"
@@ -279,6 +280,23 @@ func NewBufPane(buf *buffer.Buffer, win display.BWindow, tab *Tab) *BufPane {
 // creates a buf window.
 func NewBufPaneFromBuf(buf *buffer.Buffer, tab *Tab) *BufPane {
 	w := display.NewBufWindow(0, 0, 0, 0, buf)
+
+	// MicroNeo: 设置 MD 标志和配置
+	if md.IsMarkdownFile(buf.Path) {
+		w.IsMD = true
+		w.SetMDConfig(md.MDConfig{
+			MDRender:      config.GetGlobalOption("mdrender").(bool),
+			MDRenderIdle:  config.GetGlobalOption("mdrenderidle").(float64),
+			MDTableAlign:  buf.Settings["mdtablealign"].(bool),
+			MDTableBorder: buf.Settings["mdtableborder"].(bool),
+			MDBoldItalic: buf.Settings["mdbolditalic"].(bool),
+			MDCodeBlock:   buf.Settings["mdcodeblock"].(bool),
+			MDHeading:     buf.Settings["mdheading"].(bool),
+			MDList:        buf.Settings["mdlist"].(bool),
+			MDLink:        buf.Settings["mdlink"].(bool),
+		})
+	}
+
 	h := newBufPane(buf, w, tab)
 	// Postpone finishing initializing the pane until we know the actual geometry
 	// of the buf window.

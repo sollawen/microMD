@@ -105,6 +105,16 @@ var defaultCommonSettings = map[string]any{
 	"truecolor":       "auto",
 	"useprimary":      true,
 	"wordwrap":        false,
+
+	// MicroNeo: MD 单模块渲染开关（buffer 本地，可被 ft: / glob: 覆盖）
+	"mdrender":        true,
+	"mdtablealign":    true,
+	"mdtableborder":   false,
+	"mdbolditalic":    true,
+	"mdcodeblock":     true,
+	"mdheading":       true,
+	"mdlist":          true,
+	"mdlink":          true,
 }
 
 // a list of settings that should only be globally modified and their
@@ -132,6 +142,9 @@ var DefaultGlobalOnlySettings = map[string]any{
 	"tabhighlight":   false,
 	"tabreverse":     true,
 	"xterm":          false,
+
+	// MicroNeo: MD 全局配置
+	"mdrenderidle":   float64(10), // 编辑模式超时秒数
 }
 
 // a list of settings that should never be globally modified

@@ -7,6 +7,7 @@ import (
 	runewidth "github.com/mattn/go-runewidth"
 	"github.com/micro-editor/micro/v2/internal/buffer"
 	"github.com/micro-editor/micro/v2/internal/config"
+	"github.com/micro-editor/micro/v2/internal/md"
 	"github.com/micro-editor/micro/v2/internal/screen"
 	"github.com/micro-editor/micro/v2/internal/util"
 	"github.com/micro-editor/tcell/v2"
@@ -29,6 +30,11 @@ type BufWindow struct {
 	hasMessage       bool
 	maxLineNumLength int
 	drawDivider      bool
+
+	// MicroNeo: MD rendering support
+	IsMD     bool           // 由 BufPane 创建时设置
+	mdConfig md.MDConfig    // MD 渲染配置
+	mdCache  []md.SegmentMeta // 上一帧检测的轻量元数据缓存
 }
 
 // NewBufWindow creates a new window at a location in the screen with a width and height
@@ -899,5 +905,137 @@ func (w *BufWindow) Display() {
 
 	w.displayStatusLine()
 	w.displayScrollBar()
-	w.displayBuffer()
+	if w.IsMD {
+		w.displayBufferMD()
+	} else {
+		w.displayBuffer()
+	}
+}
+
+// SetMDConfig 设置 MD 渲染配置。
+func (w *BufWindow) SetMDConfig(cfg md.MDConfig) {
+	w.mdConfig = cfg
+}
+
+// displayBufferMD 是 displayBuffer 的 MD 渲染版本。
+// Step 0 实现：检测渲染片 → 逐片输出背景色 → 写入 screen。
+// editMode 相关逻辑在 Step 1 加入。
+func (w *BufWindow) displayBufferMD() {
+	b := w.Buf
+	if w.Height <= 0 || w.Width <= 0 {
+		return
+	}
+
+	if b.ModifiedThisFrame {
+		if b.Settings["diffgutter"].(bool) {
+			b.UpdateDiff()
+		}
+		b.ModifiedThisFrame = false
+	}
+
+	bufWidth := w.bufWidth
+	bufHeight := w.bufHeight
+
+	// 1. 检测可见区域
+	visibleStart := w.StartLine.Line
+	visibleEnd := visibleStart + bufHeight // 超过也行，detect 会截断
+	if visibleEnd >= b.LinesNum() {
+		visibleEnd = b.LinesNum() - 1
+	}
+
+	segments := md.DetectSegments(b, visibleStart, visibleEnd, bufWidth)
+	// TODO(Step 3): 将检测结果写入 w.mdCache 供 Scroll/Diff 查询
+
+	// 2. 渲染管线主循环
+	vY := 0 // 当前 screen 行（相对窗口顶部）
+
+	for _, seg := range segments {
+		// 跳过 StartLine 之前的行（softwrap offset 暂不处理，Step 0 简化）
+		rendered := seg.Render(
+			w.linesFromBuffer(seg.BufStartLine, seg.BufEndLine),
+			bufWidth,
+			w.mdConfig,
+		)
+
+		// 将 renderer 输出的相对 BufLine 转为绝对行号
+		for ri := range rendered.Rows {
+			rendered.Rows[ri].BufLine += seg.BufStartLine
+			for ci := range rendered.Rows[ri].Cells {
+				if rendered.Rows[ri].Cells[ci].BufLine >= 0 {
+					rendered.Rows[ri].Cells[ci].BufLine += seg.BufStartLine
+				}
+			}
+		}
+
+		// 写入 screen
+		for _, row := range rendered.Rows {
+			if vY >= bufHeight {
+				break
+			}
+
+			// 画 gutter + 行号
+			w.drawGutterAndLineNumMD(vY, row.BufLine)
+
+			// 画内容
+			for col, cell := range row.Cells {
+				screenX := w.X + w.gutterOffset + col
+				screenY := w.Y + vY
+				if screenX < w.X+w.gutterOffset || screenX >= w.X+w.gutterOffset+bufWidth {
+					continue
+				}
+				screen.SetContent(screenX, screenY, cell.Rune, cell.Combining, cell.Style)
+			}
+
+			vY++
+		}
+	}
+
+	// 3. 填充剩余空间
+	defStyle := config.DefStyle
+	for ; vY < bufHeight; vY++ {
+		w.drawGutterAndLineNumMD(vY, -1) // 空行，不显示行号
+		for col := 0; col < bufWidth; col++ {
+			screen.SetContent(w.X+w.gutterOffset+col, w.Y+vY, ' ', nil, defStyle)
+		}
+	}
+}
+
+// linesFromBuffer 从 buffer 读取 start..end 行（含两端），返回 []string。
+func (w *BufWindow) linesFromBuffer(start, end int) []string {
+	lines := make([]string, 0, end-start+1)
+	for i := start; i <= end && i < w.Buf.LinesNum(); i++ {
+		lines = append(lines, w.Buf.Line(i))
+	}
+	return lines
+}
+
+// drawGutterAndLineNumMD 在指定 screen 行绘制 gutter 和行号。
+// bufLine 为 -1 表示空行/续行，行号位留空。
+func (w *BufWindow) drawGutterAndLineNumMD(vY int, bufLine int) {
+	b := w.Buf
+	vloc := buffer.Loc{X: 0, Y: vY}
+	bloc := buffer.Loc{X: 0, Y: bufLine}
+
+	lineNumStyle := config.DefStyle
+	if style, ok := config.Colorscheme["line-number"]; ok {
+		lineNumStyle = style
+	}
+
+	if w.hasMessage && bufLine >= 0 {
+		w.drawGutter(&vloc, &bloc)
+	}
+	if b.Settings["diffgutter"].(bool) && bufLine >= 0 {
+		w.drawDiffGutter(lineNumStyle, false, &vloc, &bloc)
+	}
+	if b.Settings["ruler"].(bool) {
+		if bufLine >= 0 {
+			w.drawLineNum(lineNumStyle, false, &vloc, &bloc)
+		} else {
+			// 续行/空行/装饰行：行号位留空
+			for vloc.X < w.gutterOffset {
+				screen.SetContent(w.X+vloc.X, w.Y+vY, ' ', nil, lineNumStyle)
+				vloc.X++
+			}
+		}
+	}
 }
