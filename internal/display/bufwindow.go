@@ -951,8 +951,9 @@ func (w *BufWindow) displayBufferMD() {
 
 	for _, seg := range segments {
 		// 跳过 StartLine 之前的行（softwrap offset 暂不处理，Step 0 简化）
+		lines := w.linesFromBuffer(seg.BufStartLine, seg.BufEndLine)
 		rendered := seg.Render(
-			w.linesFromBuffer(seg.BufStartLine, seg.BufEndLine),
+			lines,
 			bufWidth,
 			w.mdConfig,
 		)

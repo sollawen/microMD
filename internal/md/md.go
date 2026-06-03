@@ -1,6 +1,11 @@
 package md
 
 import (
+	"os"
+	"fmt"
+	"time"
+
+	"github.com/mattn/go-runewidth"
 	"github.com/micro-editor/tcell/v2"
 )
 
@@ -47,21 +52,35 @@ type Segment struct {
 // renderLinesWithBg 是 Step 0 的公共渲染逻辑：
 // 将 lines 逐字符输出为 Cell，每行填充到 width 列，全部使用 bgStyle。
 // 返回的 RenderedSegment 中所有 BufLine 都是相对行号（从 0 开始）。
+// 注意：需要正确处理 CJK 等宽字符（占 2 列），宽字符后补一个空占位 Cell。
 func renderLinesWithBg(lines []string, width int, bgStyle tcell.Style) *RenderedSegment {
 	result := &RenderedSegment{}
 	for lineIdx, line := range lines {
 		row := RenderedRow{
 			BufLine: lineIdx, // 相对行号，displayBufferMD 调整
 		}
-		for x, r := range line {
+		col := 0
+		for _, r := range line {
+			rw := runewidth.RuneWidth(r)
 			row.Cells = append(row.Cells, Cell{
 				Rune:    r,
 				Style:   bgStyle,
 				BufLine: lineIdx,
-				BufX:    x,
+				BufX:    col,
 			})
+			col += rw
+			// 宽字符占 2 列，补一个空占位 Cell 保持背景色连续
+			if rw == 2 {
+				row.Cells = append(row.Cells, Cell{
+					Rune:    ' ',
+					Style:   bgStyle,
+					BufLine: lineIdx,
+					BufX:    -1,
+				})
+			}
 		}
-		for x := len(line); x < width; x++ {
+		// 填充到 width
+		for ; col < width; col++ {
 			row.Cells = append(row.Cells, Cell{
 				Rune:    ' ',
 				Style:   bgStyle,
@@ -72,4 +91,20 @@ func renderLinesWithBg(lines []string, width int, bgStyle tcell.Style) *Rendered
 		result.Rows = append(result.Rows, row)
 	}
 	return result
+}
+
+// mdLogFile 是调试日志文件句柄
+var mdLogFile *os.File
+
+// MdLogf 写入调试日志到 docs/md-debug.log（导出供 display 包使用）
+func MdLogf(format string, args ...interface{}) {
+	if mdLogFile == nil {
+		var err error
+		mdLogFile, err = os.OpenFile("docs/md-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return
+		}
+	}
+	ts := time.Now().Format("15:04:05.000")
+	fmt.Fprintf(mdLogFile, "[%s] "+format+"\n", append([]interface{}{ts}, args...)...)
 }

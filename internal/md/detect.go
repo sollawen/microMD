@@ -104,8 +104,8 @@ func DetectSegments(
 			}
 
 		case stateBlockquote:
-			if strings.HasPrefix(trimmed, ">") || trimmed == "" {
-				// 继续收集引用块行（包括空行）
+			if strings.HasPrefix(trimmed, ">") {
+				// 继续收集引用块行
 			} else {
 				// 引用块结束
 				segments = append(segments, Segment{
@@ -132,8 +132,8 @@ func DetectSegments(
 			}
 
 		case stateList:
-			if isListItem(trimmed) || trimmed == "" {
-				// 继续收集列表项（包括空行）
+			if isListItem(trimmed) {
+				// 继续收集列表项
 			} else {
 				// 列表结束
 				segments = append(segments, Segment{
