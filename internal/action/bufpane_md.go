@@ -25,4 +25,6 @@ func initMDConfig(buf *buffer.Buffer, w *display.BufWindow) {
 		MDList:        buf.Settings["mdlist"].(bool),
 		MDLink:        buf.Settings["mdlink"].(bool),
 	})
+	// Step 1.0：MD 文件默认进入编辑模式（光标所在 segment 回退原生显示）
+	w.SetEditMode(true)
 }

@@ -34,6 +34,7 @@ type BufWindow struct {
 	// MicroNeo: MD rendering support
 	mdConfig md.MDConfig    // MD 渲染配置
 	mdCache  []md.SegmentMeta // 上一帧检测的轻量元数据缓存
+	editMode bool           // Step 1.0：光标所在 segment 回退原生显示；Step 1.1 会接入键盘切换
 }
 
 // NewBufWindow creates a new window at a location in the screen with a width and height
@@ -87,6 +88,12 @@ func (w *BufWindow) GetView() *View {
 // SetView sets the view.
 func (w *BufWindow) SetView(view *View) {
 	w.View = view
+}
+
+// SetEditMode sets the MD edit-mode flag. When true, segments containing a
+// cursor fall back to the native displayBuffer() rendering.
+func (w *BufWindow) SetEditMode(on bool) {
+	w.editMode = on
 }
 
 // Resize resizes this window.
@@ -904,9 +911,9 @@ func (w *BufWindow) Display() {
 
 	w.displayStatusLine()
 	w.displayScrollBar()
-	if w.Buf.IsMD {
-		w.displayBufferMD()
-	} else {
+	if !w.Buf.IsMD || !w.mdConfig.MDRender {
 		w.displayBuffer()
+	} else {
+		w.displayBufferMD(w.editMode)
 	}
 }
