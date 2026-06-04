@@ -60,15 +60,17 @@ func renderLinesWithBg(lines []string, width int, bgStyle tcell.Style) *Rendered
 			BufLine: lineIdx, // 相对行号，displayBufferMD 调整
 		}
 		col := 0
+		runeIdx := 0
 		for _, r := range line {
 			rw := runewidth.RuneWidth(r)
 			row.Cells = append(row.Cells, Cell{
 				Rune:    r,
 				Style:   bgStyle,
 				BufLine: lineIdx,
-				BufX:    col,
+				BufX:    runeIdx,
 			})
 			col += rw
+			runeIdx++
 			// 宽字符占 2 列，补一个空占位 Cell 保持背景色连续
 			if rw == 2 {
 				row.Cells = append(row.Cells, Cell{

@@ -978,13 +978,52 @@ func (w *BufWindow) displayBufferMD() {
 			w.drawGutterAndLineNumMD(vY, row.BufLine)
 
 			// 画内容
+			// LineMatch 是稀疏 map：只在语法组变化的起始位置有条目，
+			// 所以需要记住上一次匹配的 group，没命中时继续沿用。
+			var lastFg tcell.Color
+			var lastAttr tcell.AttrMask
+			hasLast := false
+
 			for col, cell := range row.Cells {
 				screenX := w.X + w.gutterOffset + col
 				screenY := w.Y + vY
 				if screenX < w.X+w.gutterOffset || screenX >= w.X+w.gutterOffset+bufWidth {
 					continue
 				}
-				screen.SetContent(screenX, screenY, cell.Rune, cell.Combining, cell.Style)
+				style := cell.Style
+				if cell.BufLine >= 0 && cell.BufX >= 0 {
+					if group, ok := w.Buf.Match(cell.BufLine)[cell.BufX]; ok {
+						s := config.GetColor(group.String())
+						lastFg, _, lastAttr = s.Decompose()
+						hasLast = true
+					}
+					if hasLast {
+						_, bg, _ := style.Decompose()
+						style = tcell.StyleDefault.Foreground(lastFg).Background(bg)
+						if lastAttr&tcell.AttrBold != 0 {
+							style = style.Bold(true)
+						}
+						if lastAttr&tcell.AttrBlink != 0 {
+							style = style.Blink(true)
+						}
+						if lastAttr&tcell.AttrReverse != 0 {
+							style = style.Reverse(true)
+						}
+						if lastAttr&tcell.AttrUnderline != 0 {
+							style = style.Underline(true)
+						}
+						if lastAttr&tcell.AttrDim != 0 {
+							style = style.Dim(true)
+						}
+						if lastAttr&tcell.AttrItalic != 0 {
+							style = style.Italic(true)
+						}
+						if lastAttr&tcell.AttrStrikeThrough != 0 {
+							style = style.StrikeThrough(true)
+						}
+					}
+				}
+				screen.SetContent(screenX, screenY, cell.Rune, cell.Combining, style)
 			}
 
 			vY++
