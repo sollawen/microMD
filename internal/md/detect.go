@@ -2,6 +2,8 @@ package md
 
 import (
 	"strings"
+
+	"github.com/micro-editor/micro/v2/pkg/highlight"
 )
 
 // BufferReader 是 detect.go 对 buffer 的最小依赖接口。
@@ -10,14 +12,14 @@ type BufferReader interface {
 	LinesNum() int
 	LineBytes(n int) []byte
 	Line(n int) string
+	State(n int) highlight.State
 }
 
 // detectState 表示扫描器当前的状态。
 type detectState int
 
 const (
-	stateNormal     detectState = iota
-	stateCodeblock
+	stateNormal detectState = iota
 	stateBlockquote
 	stateTable
 	stateList
@@ -37,129 +39,136 @@ func DetectSegments(
 ) []Segment {
 	segments := []Segment{}
 	state := stateNormal
-	var startLine int // 当前多行结构起始行
+	var startLine int // 当前多行结构起始行（blockquote/table/list 用）
 
-	i := visibleStart
-	for i <= visibleEnd {
-		if i >= buf.LinesNum() {
+	// codeblock 边界跟踪：用 highlighter state 转折点
+	var codeblockStart int = -1
+	var lastState highlight.State
+	if visibleStart > 0 {
+		lastState = buf.State(visibleStart - 1)
+	}
+
+	for y := visibleStart; y <= visibleEnd; y++ {
+		if y >= buf.LinesNum() {
 			break
 		}
 
-		line := buf.Line(i)
-		trimmed := strings.TrimSpace(line)
+		curState := buf.State(y)
 
-		// reprocessFlag: true 表示当前行需要在新状态下重新判断
+		// ── Codeblock 边界：用 highlighter state 转折点 ──
+		if lastState == nil && curState != nil {
+			codeblockStart = y // 进入 codeblock
+		}
+		if lastState != nil && curState == nil {
+			segments = append(segments, Segment{
+				BufStartLine: codeblockStart,
+				BufEndLine:   y, // 退出行也包进 codeblock
+				Render:       RenderCodeBlock,
+			})
+			codeblockStart = -1
+			lastState = curState
+			continue // 退出行已归入 codeblock，不再做字符串匹配
+		}
+
+		// codeblock 内部行：不产生独立 segment，跳过
+		if curState != nil {
+			lastState = curState
+			continue
+		}
+
+		// ── 非 codeblock 行：字符串匹配 ──
+		line := buf.Line(y)
+		trimmed := strings.TrimSpace(line)
 		reprocess := false
 
 		switch state {
 		case stateNormal:
-			// 块结构优先检查（多行结构优先级高于单行）
-			if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
-				state = stateCodeblock
-				startLine = i
-			} else if strings.HasPrefix(trimmed, ">") {
+			if strings.HasPrefix(trimmed, ">") {
 				state = stateBlockquote
-				startLine = i
+				startLine = y
 			} else if strings.Contains(trimmed, "|") && trimmed != "" {
 				state = stateTable
-				startLine = i
+				startLine = y
 			} else if isListItem(trimmed) {
 				state = stateList
-				startLine = i
+				startLine = y
 			} else if strings.HasPrefix(trimmed, "#") {
-				// 单行标题
 				segments = append(segments, Segment{
-					BufStartLine: i,
-					BufEndLine:   i,
+					BufStartLine: y,
+					BufEndLine:   y,
 					Render:       RenderHeading,
 				})
 			} else if isHR(trimmed) {
-				// 单行分割线
 				segments = append(segments, Segment{
-					BufStartLine: i,
-					BufEndLine:   i,
+					BufStartLine: y,
+					BufEndLine:   y,
 					Render:       RenderHR,
 				})
 			} else {
-				// 兜底：段落
 				segments = append(segments, Segment{
-					BufStartLine: i,
-					BufEndLine:   i,
+					BufStartLine: y,
+					BufEndLine:   y,
 					Render:       RenderParagraph,
 				})
-			}
-
-		case stateCodeblock:
-			if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
-				// 代码块闭合，包含当前行
-				segments = append(segments, Segment{
-					BufStartLine: startLine,
-					BufEndLine:   i,
-					Render:       RenderCodeBlock,
-				})
-				state = stateNormal
-				// 代码块闭合后，当前行已处理，进入下一行
-			} else {
-				// 继续收集代码块内容，当前行已处理
 			}
 
 		case stateBlockquote:
 			if strings.HasPrefix(trimmed, ">") {
 				// 继续收集引用块行
 			} else {
-				// 引用块结束
 				segments = append(segments, Segment{
 					BufStartLine: startLine,
-					BufEndLine:   i - 1,
+					BufEndLine:   y - 1,
 					Render:       RenderBlockquote,
 				})
 				state = stateNormal
-				reprocess = true // 当前行需要在新状态下重新判断
+				reprocess = true
 			}
 
 		case stateTable:
 			if strings.Contains(trimmed, "|") && trimmed != "" {
 				// 继续收集表格行
 			} else {
-				// 表格结束
 				segments = append(segments, Segment{
 					BufStartLine: startLine,
-					BufEndLine:   i - 1,
+					BufEndLine:   y - 1,
 					Render:       RenderTable,
 				})
 				state = stateNormal
-				reprocess = true // 当前行需要在新状态下重新判断
+				reprocess = true
 			}
 
 		case stateList:
 			if isListItem(trimmed) {
 				// 继续收集列表项
 			} else {
-				// 列表结束
 				segments = append(segments, Segment{
 					BufStartLine: startLine,
-					BufEndLine:   i - 1,
+					BufEndLine:   y - 1,
 					Render:       RenderList,
 				})
 				state = stateNormal
-				reprocess = true // 当前行需要在新状态下重新判断
+				reprocess = true
 			}
 		}
 
-		// 根据是否需要重新处理来决定是否递增 i
 		if !reprocess {
-			i++
+			lastState = curState
 		}
+		// reprocess 时 lastState 不变（curState==nil，lastState 也是 nil）
 	}
 
-	// 处理末尾未闭合的状态
-	switch state {
-	case stateCodeblock:
+	// 未闭合的 codeblock
+	if codeblockStart != -1 {
 		segments = append(segments, Segment{
-			BufStartLine: startLine,
+			BufStartLine: codeblockStart,
 			BufEndLine:   visibleEnd,
 			Render:       RenderCodeBlock,
 		})
+	}
+
+	// 未闭合的 blockquote/table/list
+	switch state {
 	case stateBlockquote:
 		segments = append(segments, Segment{
 			BufStartLine: startLine,

@@ -3,6 +3,7 @@ package md
 import (
 	"testing"
 
+	"github.com/micro-editor/micro/v2/pkg/highlight"
 	"github.com/micro-editor/tcell/v2"
 )
 
@@ -24,6 +25,8 @@ func (m *mockBuffer) Line(n int) string {
 	}
 	return ""
 }
+
+func (m *mockBuffer) State(n int) highlight.State { return nil }
 
 // segmentType 用于标识 segment 的渲染类型（测试用）
 type segmentType int
