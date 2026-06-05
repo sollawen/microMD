@@ -103,7 +103,7 @@ func DetectSegments(
 				segments = append(segments, Segment{
 					BufStartLine: y,
 					BufEndLine:   y,
-					Render:       RenderParagraph,
+					Render:       RenderNormal,
 				})
 			}
 

@@ -32,7 +32,7 @@ const (
 	typeBlockquote
 	typeList
 	typeHR
-	typeParagraph
+	typeNormal
 )
 
 // getSegmentType 通过调用 segment 的 Render 函数来识别其类型
@@ -68,7 +68,7 @@ func getSegmentType(seg Segment) segmentType {
 		}
 	}
 
-	return typeParagraph
+	return typeNormal
 }
 
 func TestDetectHeading(t *testing.T) {
@@ -85,7 +85,7 @@ func TestDetectHeading(t *testing.T) {
 			segments[0].BufStartLine, segments[0].BufEndLine)
 	}
 	if segments[1].BufStartLine != 1 || segments[1].BufEndLine != 1 {
-		t.Fatalf("paragraph segment: expected [1,1], got [%d,%d]",
+		t.Fatalf("normal segment: expected [1,1], got [%d,%d]",
 			segments[1].BufStartLine, segments[1].BufEndLine)
 	}
 }
@@ -128,8 +128,8 @@ func TestDetectCodeBlock(t *testing.T) {
 	if segType := getSegmentType(segments[0]); segType != typeCodeBlock {
 		t.Fatalf("expected codeblock, got %v", segType)
 	}
-	if segType := getSegmentType(segments[1]); segType != typeParagraph {
-		t.Fatalf("expected paragraph, got %v", segType)
+	if segType := getSegmentType(segments[1]); segType != typeNormal {
+		t.Fatalf("expected normal, got %v", segType)
 	}
 }
 
@@ -213,7 +213,7 @@ func TestDetectBlockquoteWithEmptyLines(t *testing.T) {
 	}}
 	segments := DetectSegments(buf, 0, 3)
 	// Blockquote with empty lines: lines 0-2 are blockquote (empty lines included)
-	// Line 3 is paragraph
+	// Line 3 is normal
 	if len(segments) != 2 {
 		t.Fatalf("expected 2 segments, got %d", len(segments))
 	}
@@ -316,7 +316,7 @@ func TestDetectMixedHR(t *testing.T) {
 	buf := &mockBuffer{lines: []string{
 		"# Title",
 		"---",
-		"paragraph",
+		"normal",
 	}}
 	segments := DetectSegments(buf, 0, 2)
 	if len(segments) != 3 {
@@ -328,8 +328,8 @@ func TestDetectMixedHR(t *testing.T) {
 	if segType := getSegmentType(segments[1]); segType != typeHR {
 		t.Fatalf("segment 1: expected hr, got %v", segType)
 	}
-	if segType := getSegmentType(segments[2]); segType != typeParagraph {
-		t.Fatalf("segment 2: expected paragraph, got %v", segType)
+	if segType := getSegmentType(segments[2]); segType != typeNormal {
+		t.Fatalf("segment 2: expected normal, got %v", segType)
 	}
 }
 
@@ -337,7 +337,7 @@ func TestDetectMixedContent(t *testing.T) {
 	buf := &mockBuffer{lines: []string{
 		"# Main Title",
 		"",
-		"This is a paragraph with some text.",
+		"This is a normal with some text.",
 		"",
 		"## Subtitle",
 		"",
@@ -356,18 +356,18 @@ func TestDetectMixedContent(t *testing.T) {
 		"",
 		"---",
 		"",
-		"Final paragraph",
+		"Final normal",
 	}}
 	segments := DetectSegments(buf, 0, len(buf.lines)-1)
 
 	// Expected segments (15 total):
 	// Empty lines within list/blockquote are included in those structures
-	// 0: heading, 1: paragraph (empty), 2: paragraph, 3: paragraph (empty)
-	// 4: heading, 5: paragraph (empty)
+	// 0: heading, 1: normal (empty), 2: normal, 3: normal (empty)
+	// 4: heading, 5: normal (empty)
 	// 6: list (6-8, includes empty line 8)
 	// 7: blockquote (9-10, includes empty line 10)
-	// 8: table (11-13), 9: paragraph (empty), 10: codeblock
-	// 11: paragraph (empty), 12: hr, 13: paragraph (empty), 14: paragraph
+	// 8: table (11-13), 9: normal (empty), 10: codeblock
+	// 11: normal (empty), 12: hr, 13: normal (empty), 14: normal
 
 	if len(segments) != 15 {
 		t.Fatalf("expected 15 segments, got %d", len(segments))
@@ -427,10 +427,10 @@ func TestDetectMixedContent(t *testing.T) {
 	}
 }
 
-func TestDetectParagraphOnly(t *testing.T) {
+func TestDetectNormalOnly(t *testing.T) {
 	buf := &mockBuffer{lines: []string{
 		"Just some text without any markdown features.",
-		"Another paragraph here.",
+		"Another normal here.",
 		"Yet another line.",
 	}}
 	segments := DetectSegments(buf, 0, 2)
@@ -438,8 +438,8 @@ func TestDetectParagraphOnly(t *testing.T) {
 		t.Fatalf("expected 3 segments, got %d", len(segments))
 	}
 	for i := range segments {
-		if segType := getSegmentType(segments[i]); segType != typeParagraph {
-			t.Fatalf("segment %d: expected paragraph, got %v", i, segType)
+		if segType := getSegmentType(segments[i]); segType != typeNormal {
+			t.Fatalf("segment %d: expected normal, got %v", i, segType)
 		}
 	}
 }
@@ -470,14 +470,14 @@ func TestDetectEmptyLines(t *testing.T) {
 		"line 6",
 	}}
 	segments := DetectSegments(buf, 0, 5)
-	// Each line (including empty lines) is treated as a paragraph
+	// Each line (including empty lines) is treated as a normal
 	// 6 lines = 6 segments
 	if len(segments) != 6 {
 		t.Fatalf("expected 6 segments, got %d", len(segments))
 	}
 	for i := range segments {
-		if segType := getSegmentType(segments[i]); segType != typeParagraph {
-			t.Fatalf("segment %d: expected paragraph, got %v", i, segType)
+		if segType := getSegmentType(segments[i]); segType != typeNormal {
+			t.Fatalf("segment %d: expected normal, got %v", i, segType)
 		}
 	}
 }
@@ -524,7 +524,7 @@ func TestDetectVisibleRange(t *testing.T) {
 	if len(segments) != 3 {
 		t.Fatalf("expected 3 segments, got %d", len(segments))
 	}
-	// First segment should be line 1 (paragraph), not line 0 (heading)
+	// First segment should be line 1 (normal), not line 0 (heading)
 	if segments[0].BufStartLine != 1 {
 		t.Fatalf("first segment should start at line 1, got %d", segments[0].BufStartLine)
 	}
