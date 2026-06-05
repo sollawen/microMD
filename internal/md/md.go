@@ -22,7 +22,7 @@ type Cell struct {
 // RenderedRow 是渲染后的一行屏幕输出。
 type RenderedRow struct {
 	Cells   []Cell
-	BufLine int  // 这行对应的 buffer 行号（复用 softwrap 规则：首行有值，续行/装饰行为 -1）
+	BufLine int  // 这行对应的 buffer 行号（wrap 续行也保留真实行号，display 层决定是否显示行号）
 }
 
 // RenderedSegment 是一个渲染片的完整渲染输出。

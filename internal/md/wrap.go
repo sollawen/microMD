@@ -17,7 +17,7 @@ import (
 // - 空行返回一个填充空格的 Row（不返回零个 Row）。
 // - 行尾/行首空格丢弃。
 //
-// BufLine 规则：首行 Row.BufLine = bufLine，续行 Row.BufLine = -1；
+// BufLine 规则：Row.BufLine 始终保留真实 bufLine；
 // Cell.BufLine 始终保留正确映射。Cell.BufX：真实字符保留原始偏移，填充/CJK占位为 -1。
 func wrapCells(cells []Cell, width int, bufLine int, padStyle tcell.Style) []RenderedRow {
 	// 空行 → 返回一个填充空格的 Row
@@ -187,13 +187,8 @@ func makePaddingRow(width int, bufLine int, style tcell.Style) RenderedRow {
 // appendRow 把 cells 填充到 width 并追加到 rows。
 // 处理 CJK 占位 Cell 和行尾填充。
 func appendRow(rows []RenderedRow, cells []Cell, width int, bufLine int, padStyle tcell.Style, isFirstRow bool) []RenderedRow {
-	rowBufLine := bufLine
-	if !isFirstRow {
-		rowBufLine = -1
-	}
-
 	row := RenderedRow{
-		BufLine: rowBufLine,
+		BufLine: bufLine,
 		Cells:   make([]Cell, 0, width),
 	}
 

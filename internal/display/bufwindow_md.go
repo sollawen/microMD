@@ -71,13 +71,16 @@ func (w *BufWindow) renderSegmentMD(
 	}
 
 	// 写入 screen
+	lastBufLine := -1
 	for _, row := range rendered.Rows {
 		if vY >= bufHeight {
 			break
 		}
 
-		// 画 gutter + 行号
-		w.drawGutterAndLineNumMD(vY, row.BufLine)
+		// 画 gutter + 行号（续行 softwrapped=true，行号留空但 diff 标志照画）
+		softwrapped := row.BufLine >= 0 && row.BufLine == lastBufLine
+		w.drawGutterAndLineNumMD(vY, row.BufLine, softwrapped)
+		lastBufLine = row.BufLine
 
 		// 画内容
 		for col, cell := range row.Cells {
@@ -645,7 +648,7 @@ func (w *BufWindow) displayBufferMD(editMode bool) {
 	// 3. 填充剩余空间
 	defStyle := config.DefStyle
 	for ; vY < bufHeight; vY++ {
-		w.drawGutterAndLineNumMD(vY, -1) // 空行，不显示行号
+		w.drawGutterAndLineNumMD(vY, -1, false) // 空行，不显示行号
 		for col := 0; col < bufWidth; col++ {
 			screen.SetContent(w.X+w.gutterOffset+col, w.Y+vY, ' ', nil, defStyle)
 		}
@@ -689,8 +692,7 @@ func filterSegmentsToVisible(segs []md.Segment, startY, endY int) []md.Segment {
 }
 
 // computeRowCounts 计算 render 后的 RenderedSegment 中，每个 buffer 行占几个 screen row。
-// RenderedRow.BufLine：首行是有效 buffer 行号，续行/装饰行为 -1。
-// 所以用 BufLine 变化点切分，统计连续相同 BufLine 的 Row 数。
+// RenderedRow.BufLine 始终保留真实行号（续行也保留），用 BufLine 变化点切分统计。
 func computeRowCounts(rendered *md.RenderedSegment) []int {
 	counts := make([]int, 0, len(rendered.Rows))
 	lastBufLine := -2 // 用 -2 保证首次遇到 BufLine==-1（装饰行）也能起一个计数
@@ -706,8 +708,9 @@ func computeRowCounts(rendered *md.RenderedSegment) []int {
 }
 
 // drawGutterAndLineNumMD 在指定 screen 行绘制 gutter 和行号。
-// bufLine 为 -1 表示空行/续行，行号位留空。
-func (w *BufWindow) drawGutterAndLineNumMD(vY int, bufLine int) {
+// bufLine 为 -1 表示空行/装饰行。
+// softwrapped=true 表示该行是 wrap 续行，行号留空但 diff 标志照画。
+func (w *BufWindow) drawGutterAndLineNumMD(vY int, bufLine int, softwrapped bool) {
 	b := w.Buf
 	vloc := buffer.Loc{X: 0, Y: vY}
 	bloc := buffer.Loc{X: 0, Y: bufLine}
@@ -721,10 +724,10 @@ func (w *BufWindow) drawGutterAndLineNumMD(vY int, bufLine int) {
 		w.drawGutter(&vloc, &bloc)
 	}
 	if b.Settings["diffgutter"].(bool) && bufLine >= 0 {
-		w.drawDiffGutter(lineNumStyle, false, &vloc, &bloc)
+		w.drawDiffGutter(lineNumStyle, softwrapped, &vloc, &bloc)
 	}
 	if b.Settings["ruler"].(bool) {
-		if bufLine >= 0 {
+		if bufLine >= 0 && !softwrapped {
 			w.drawLineNum(lineNumStyle, false, &vloc, &bloc)
 		} else {
 			// 续行/空行/装饰行：行号位留空
