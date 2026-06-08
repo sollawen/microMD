@@ -1,6 +1,6 @@
 #!/bin/sh
 # microNeo one-line installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/master/install.sh | sh
 
 set -e
 

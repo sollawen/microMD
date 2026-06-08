@@ -65,7 +65,7 @@ microNeo works differently: **editing and rendering in one window**. You see ren
 ### One-line Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/master/install.sh | sh
 ```
 
 ### Build from Source
