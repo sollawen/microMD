@@ -28,7 +28,8 @@ create_artefact_generic()
 
 create_artefact_windows()
 {
-	mv microneo.exe microneo-$VERSION/
+	# go build -o microneo produces "microneo" even with GOOS=windows
+	mv microneo microneo-$VERSION/microneo.exe
 	zip -r -q -T microneo-$VERSION-$1.zip microneo-$VERSION
 	sha256sum microneo-$VERSION-$1.zip > microneo-$VERSION-$1.zip.sha
 	mv microneo-$VERSION-$1.* binaries
