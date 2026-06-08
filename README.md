@@ -86,6 +86,14 @@ sudo mv microneo /usr/local/bin
 
 microNeo uses `$XDG_CONFIG_HOME/microNeo/` for config (defaults to `~/.config/microNeo/`), separate from Micro's original `~/.config/micro/`.
 
+If you see garbled text on mouse click (common on Linux), set clipboard mode to `terminal` in `~/.config/microNeo/settings.json`:
+
+```json
+{
+  "clipboard": "terminal"
+}
+```
+
 ## 3. Usage
 
 ```bash
