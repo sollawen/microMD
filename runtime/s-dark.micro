@@ -14,9 +14,9 @@ color-link error "bold #FF4444,#100F0F"
 color-link todo "bold #FF8844,#100F0F"
 color-link hlsearch "#000000,#B4EC85"
 color-link statusline "#c0c0c0,#303030"
-color-link statusline.special "#f0f0f0,#db7c41"
-color-link statusline.dim "#FFFFFF,#6080b0"
-color-link statusline.normal "#CCCCCC,#707070"
+color-link statusline.special "#1a1a2e,#e8a838"
+color-link statusline.normal "#c0c0c0,#303030"
+color-link statusline.dim "#e0e0e0,#306080"
 color-link tabbar "#100F0F,#C5C8C6"
 color-link indent-char "#505050,#100F0F"
 color-link line-number "#656866,#100F0F"
@@ -48,7 +48,7 @@ color-link md-blockquote "#62B1FE,#100F0F"          # ← 原 preproc
 color-link md-bold "#d4d4d4,#100F0F"                # ← 原 constant.string
 color-link md-italic "#b5b8b6,#100F0F"              # ← 原 default
 color-link md-strikethrough "#b5b8b6,#100F0F"       # ← 原 default
-color-link md-inline-code "#b58654,#1f1a10"         # ← 原 keyword
+color-link md-inline-code "#55a6b4,#3f3a30"         # ← 原 keyword
 color-link md-list "#96CBFE,#100F0F"                # ← 原 statement
 color-link md-checkbox "#96CBFE,#100F0F"            # ← 原 statement
 color-link md-link "#FF73FD,#100F0F"                # ← 原 constant
@@ -56,5 +56,5 @@ color-link md-image "#D33682,#100F0F"
 color-link md-url "#FF73FD,#100F0F"                 # ← 原 constant
 color-link md-codeblock "#b5b8b6,#201F1F"           # ← 无语言代码块文字
 color-link md-frame "#505050,#100F0F"               # ← 新增（装饰边框）
-color-link md-frame-label "#7090b0,#100F0F"         # ← 新增（代码块语言名）
+color-link md-frame-label "#909090,#100F0F"         # ← 新增（代码块语言名）
 color-link md-misc "#62B1FE,#100F0F"                # ← 原 preproc（特殊符号）

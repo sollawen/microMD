@@ -7,7 +7,9 @@
 
 ***The AI era is coming — less code, more Markdown.***
 
-**A Terminal Markdown Editor — View and edit, together.**
+It's the only terminal editor that renders and edits Markdown in the same window. Similar tools like Glow/frogmouth are viewers (read-only), and other Markdown editors use split panes. **microNeo does both in one view**.
+
+*Built in Go, single binary, one-line install.*
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
@@ -25,7 +27,7 @@ Open a file, **Click, then edit, that's simple.**
 
 ---
 
-<img src="./assets/microneo-demo.png" width="70%">
+ ![Demo](./assets/microneo-demo2.png) 
 
 ## 1. Why microNeo
 
