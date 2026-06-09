@@ -1,6 +1,6 @@
 # microNeo Marketing Plan
 
-> Last updated: 2026-06-08
+> Last updated: 2026-06-09
 
 ---
 
@@ -27,24 +27,23 @@
 | 确定核心卖点：同窗口渲染 + 编辑 | ✅ 完成 | 全网无竞品，验证过 |
 | awesome-tuis PR | ✅ 已提交 | [PR #713](https://github.com/rothgar/awesome-tuis/pull/713)（19.3k ⭐） |
 | awesome-cli-apps PR | ✅ 已提交 | [PR #1142](https://github.com/agarrharr/awesome-cli-apps/pull/1142)（19.7k ⭐） |
-| awesome-modern-cli PR | ✅ 已提交 | [PR #20](https://github.com/thegdsks/awesome-modern-cli/pull/20)（358 ⭐） |
+| awesome-modern-cli PR | ✅ 已提交 | [PR #20](https://github.com/thegdsks/awesome-modern-cli/pull/20)（361 ⭐） |
 | awesome-markdown PR | ✅ 已提交 | [PR #124](https://github.com/BubuAnabelas/awesome-markdown/pull/124)（931 ⭐） |
 | 中国独立开发者列表 PR | ✅ 已提交 | [PR #975](https://github.com/1c7/chinese-independent-developer/pull/975)（48.8k ⭐ 程序员版面） |
 | HelloGitHub 投稿 | ✅ 已提交 | [Issue #3335](https://github.com/521xueweihan/HelloGitHub/issues/3335)（160k ⭐ 月刊） |
 | 安装 gh (GitHub CLI) | ✅ 完成 | `gh auth login` as sollawen |
 | 推广调研报告 | ✅ 完成 | `docs/推广调研报告.md` |
 
-### 📋 Day 2 — 2026-06-09（周一）白天准备
+### ✅ Day 2 — 2026-06-09（周一）白天准备
 
-| 任务 | 优先级 | 说明 |
+| 任务 | 优先级 | 状态 |
 |------|--------|------|
-| **优化 README** | P0 | 去掉 "AI era" 说教，压缩 Why microNeo，首屏一句话讲清 |
-| **检查 demo 截图** | P0 | 确认 microneo-demo2.png 效果够震撼，不够就重截 |
-| **起草 HN Show HN 帖子** | P0 | 标题 + 正文，写好存档 |
-| **起草 Reddit 帖子** | P1 | r/commandline 版 |
-| **起草 V2EX 帖子** | P1 | 分享创造节点 |
+| **优化 README** | P0 | ✅ 定稿，去掉 AI era，压缩 Why microNeo，截图提前 |
+| **检查 demo 截图** | P0 | ✅ 确认 microneo-demo2.png 效果 OK |
+| **起草推广通稿** | P0 | ✅ HN + Reddit 通用稿件已写好，见下方通稿章节 |
+| **GitHub Release** | P0 | ✅ 已有 v1.0.2，6 平台二进制 + SHA |
 
-### 📋 Day 2 — 2026-06-09（周一）晚上发布
+### 📋 Day 2 — 2026-06-09（周一）晚上发布（待执行）
 
 | 任务 | 时间 | 说明 |
 |------|------|------|
@@ -63,30 +62,47 @@
 
 ---
 
-## HN 发帖方案
+## 推广通稿（所有渠道共用）
 
-### 标题
+> 发布前按平台规则微调，Last updated: 2026-06-09
 
-```
-Show HN: microNeo – The only terminal Markdown editor that renders in-place
-```
-
-### 正文（草稿，Day 2 定稿）
+### 正文
 
 ```
-I love Micro, and I love Glow. But I kept switching between them — 
-edit in Micro, preview in Glow, back to Micro, back to Glow...
+I use Micro to edit Markdown files, and Glow to read them. The constant switching drove me crazy.
 
-So I forked Micro and added a Markdown rendering layer. 
-Open any .md file and you see it rendered beautifully. 
-Click anywhere to edit the source. No split panes, no context switching.
+Every other solution either can't edit (Glow, frogmouth) or splits your screen in two (vim plugins, GUI editors). Terminal screens aren't wide to begin with — splitting them is painful.
+
+So I forked Micro and added a Markdown rendering layer. Open any .md file, you see it rendered. Click anywhere to edit the source. No split panes.
 
 [截图]
 
-One-line install: curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/master/install.sh | sh
+Built in Go, single binary. One-line install:
+curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/master/install.sh | sh
 
 Works great as $EDITOR for Claude Code, Yazi, etc.
+
+https://github.com/sollawen/microNeo
 ```
+
+### 对比表（回复评论用）
+
+| | microNeo | Micro / nano | glow / leaf | vim + plugins | GUI Editors |
+|--|:---------:|:-------------:|:------------:|:------------:|:-------------:|
+| **Editable** | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Markdown Rendering** | ✅ | ❌ | ✅ | ✅ | ✅ |
+| **Same Interface** | ✅ | — | — | ❌ (split) | ❌ (split) |
+| **Low Learning Curve** | ✅ | ✅ | ✅ | ❌ | ✅ |
+
+### 各平台差异
+
+| | HN | Reddit | V2EX |
+|--|-----|--------|------|
+| 标题 | Show HN: microNeo – A terminal Markdown editor that renders and edits in the same window | 同左（去掉 Show HN:） | 待定 |
+| 语言 | English | English | 中文 |
+| 正文长度 | ≤ 300 字 | 不限 | 不限 |
+| 链接 | 正文末尾 | 正文末尾 | 正文末尾 |
+| 态度 | 谦虚，接受批评 | 友好，诚实说是自己做的 | 分享创造，轻松 |
 
 ### HN 发帖规则提醒
 
@@ -96,6 +112,12 @@ Works great as $EDITOR for Claude Code, Yazi, etc.
 - 不要自己顶帖，不要叫朋友顶帖（HN 会检测并惩罚）
 - 态度谦虚，接受批评
 
+### 待起草
+
+- **V2EX 中文版** — 发在分享创造节点，用中文写
+- **掘金文章** — "I forked Micro to make..." 个人故事角度，Go + 终端工具受众
+- **dev.to 文章** — 同掘金，英文版
+
 ---
 
 ## README 优化要点（Day 2 执行）
@@ -104,6 +126,7 @@ Works great as $EDITOR for Claude Code, Yazi, etc.
 2. **压缩 Why microNeo** — 5 个小节 → 2-3 句话 + 对比表格
 3. **首屏一句话说明** — 先说产品是什么，再讲为什么
 4. **截图放最前面** — 视觉冲击力 > 文字
+5. **不需要 GIF** — microNeo 是通用编辑器，核心卖点"同窗口渲染+编辑"静态截图就能传达，没有特别需要演示的操作
 
 ---
 
@@ -113,12 +136,13 @@ Works great as $EDITOR for Claude Code, Yazi, etc.
 |--------|------|----------|------|
 | 🔴 P0 | awesome-tuis | 长期每天 10-50 浏览 | ✅ PR 已提交 |
 | 🔴 P0 | awesome-cli-apps | 同上 | ✅ PR 已提交 |
-| 🔴 P0 | HN Show HN | 0-300+ stars | 📋 Day 2 |
-| 🟡 P1 | Reddit r/commandline | 50-200 浏览 | 📋 Day 2 |
+| 🔴 P0 | HN Show HN | 0-300+ stars | 📋 今晚 20:00 |
+| 🟡 P1 | Reddit r/commandline | 50-200 浏览 | 📋 今晚同步 |
 | 🟡 P1 | V2EX | 50-200 浏览 | 📋 Day 3 |
 | 🟢 P2 | dev.to 文章 | ❤️ 10-50 | 📋 Week 2 |
 | 🟢 P2 | 掘金文章 | 100-500 浏览 | 📋 Week 2 |
-| 🟢 P2 | Homebrew formula | 发现性提升 | 📋 Week 2 |
+| 🟢 P2 | awesome-modern-cli | 长期少量浏览 | ✅ PR 已提交 |
+| 🟢 P2 | Homebrew | 发现性提升 | ⏸️ 暂缓，等 200+ stars 再尝试官方 homebrew-core |
 
 ---
 
@@ -167,6 +191,6 @@ Works great as $EDITOR for Claude Code, Yazi, etc.
 |------|-------|----------------|-----|---------|-----------|
 | rothgar/awesome-tuis | 19.3k | 活跃（最近 merge 6/3） | [#713](https://github.com/rothgar/awesome-tuis/pull/713) | Editors | 高 |
 | **agarrharr/awesome-cli-apps** | 19.7k | 很活跃（6/4~6/7 天天 merge） | [#1142](https://github.com/agarrharr/awesome-cli-apps/pull/1142) | Text Editors + Markdown | 中高 |
-| thegdsks/awesome-modern-cli | 358 | 月更（最近 merge 5/6） | [#20](https://github.com/thegdsks/awesome-modern-cli/pull/20) | Text Editors | 高 |
-| **1c7/chinese-independent-developer** | **48.8k** | **很活跃（6/5~6/8 天天 merge）** | [**#975**](https://github.com/1c7/chinese-independent-developer/pull/975) | 程序员版面 | 高 |
+| thegdsks/awesome-modern-cli | 361 | 月更（最近 merge 5/6） | [#20](https://github.com/thegdsks/awesome-modern-cli/pull/20) | Text Editors | 高 |
+| **1c7/chinese-independent-developer** | **48.8k** | **很活跃（6/5~6/8 天天 merge）** | [**#975**](https://github.com/1c7/chinese-independent-developer/pull/975) | 程序员版面 | ✅ 已 merge（6/9） |
 | **521xueweihan/HelloGitHub** | **160k** | 月刊发布，审核周期 1-4 周 | [**Issue #3335**](https://github.com/521xueweihan/HelloGitHub/issues/3335) | Go 类目投稿 | 中高（需审核） |
