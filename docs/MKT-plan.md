@@ -25,8 +25,8 @@
 |------|------|-----------|
 | 竞品调研（HN 数据、GitHub stars） | ✅ 完成 | 见附录 A |
 | 确定核心卖点：同窗口渲染 + 编辑 | ✅ 完成 | 全网无竞品，验证过 |
-| awesome-tuis PR | ✅ 已提交 | [PR #713](https://github.com/rothgar/awesome-tuis/pull/713)（19.3k ⭐） |
-| awesome-cli-apps PR | ✅ 已提交 | [PR #1142](https://github.com/agarrharr/awesome-cli-apps/pull/1142)（19.7k ⭐） |
+| awesome-tuis PR | ✅ CI 通过，等待 merge | [PR #713](https://github.com/rothgar/awesome-tuis/pull/713)（19.3k ⭐） |
+| awesome-cli-apps PR | ❌ 被关闭（无评论无理由） | [PR #1142](https://github.com/agarrharr/awesome-cli-apps/pull/1142)（19.7k ⭐） |
 | awesome-modern-cli PR | ✅ 已提交 | [PR #20](https://github.com/thegdsks/awesome-modern-cli/pull/20)（361 ⭐） |
 | awesome-markdown PR | ✅ 已提交 | [PR #124](https://github.com/BubuAnabelas/awesome-markdown/pull/124)（931 ⭐） |
 | 中国独立开发者列表 PR | ✅ 已提交 | [PR #975](https://github.com/1c7/chinese-independent-developer/pull/975)（48.8k ⭐ 程序员版面） |
@@ -43,22 +43,25 @@
 | **起草推广通稿** | P0 | ✅ HN + Reddit 通用稿件已写好，见下方通稿章节 |
 | **GitHub Release** | P0 | ✅ 已有 v1.0.2，6 平台二进制 + SHA |
 
-### 📋 Day 2 — 2026-06-09（周一）晚上发布（待执行）
+### 🔶 Day 2 — 2026-06-09（周一）晚上发布
 
-| 任务 | 时间 | 说明 |
-|------|------|------|
-| **HN Show HN 发帖** | 北京时间 20:00-21:00 | 美东早 8-9 点，最佳时段 |
-| **Reddit r/commandline** | 同上 | 趁 HN 热度同步发 |
+| 任务 | 时间 | 状态 | 说明 |
+|------|------|------|------|
+| **HN Show HN 发帖** | 21:16 | ❌ 被拒 | 新号限制，需先攒 karma，一周后重试 |
+| **Reddit r/commandline** | 21:30 | ⏳ 等审核 | 已发帖，flair: Terminal User Interface，注意 Rule 5 限制新项目 |
+| **V2EX** | — | ❌ 需邀请码 | 注册需要邀请码，待获取 |
 
-### 📋 后续（Day 3+）
+### 📋 Day 3+ 待办
 
-| 任务 | 说明 |
-|------|------|
-| V2EX 发帖 | 分享创造节点 |
-| 掘金文章 | Go + 终端工具受众 |
-| Homebrew formula 提交 | 提升发现性 |
-| dev.to 文章 | "I forked Micro to make..." 个人故事角度 |
-| awesome 列表跟进 | 检查 4 个 PR 是否被 merge |
+| 任务 | 说明 | 优先级 |
+|------|------|--------|
+| HN 攒 karma | 先逛 HN 发评论，攒够再发 Show HN | P1 |
+| Reddit 审核 | 关注 r/commandline 帖子是否通过 | P1 |
+| V2EX 发帖 | 需先搞到邀请码，注册后发分享创造节点 | P1 |
+| 掘金文章 | 先注册账号，Go + 终端工具受众 | P2 |
+| dev.to 文章 | 先注册账号，英文版个人故事 | P2 |
+| Homebrew formula 提交 | 等 200+ stars 再尝试 | P3 |
+| Discord 推广 | 加入 CLI/TUI/Go 相关服务器，适当推广 | P2 |
 
 ---
 
@@ -137,7 +140,7 @@ https://github.com/sollawen/microNeo
 | 🔴 P0 | awesome-tuis | 长期每天 10-50 浏览 | ✅ PR 已提交 |
 | 🔴 P0 | awesome-cli-apps | 同上 | ✅ PR 已提交 |
 | 🔴 P0 | HN Show HN | 0-300+ stars | 📋 今晚 20:00 |
-| 🟡 P1 | Reddit r/commandline | 50-200 浏览 | 📋 今晚同步 |
+| 🟡 P1 | Reddit r/commandline | 50-200 浏览 | ✅ 已发，等审核（注意 Rule 5 限制新项目） |
 | 🟡 P1 | V2EX | 50-200 浏览 | 📋 Day 3 |
 | 🟢 P2 | dev.to 文章 | ❤️ 10-50 | 📋 Week 2 |
 | 🟢 P2 | 掘金文章 | 100-500 浏览 | 📋 Week 2 |
@@ -190,7 +193,7 @@ https://github.com/sollawen/microNeo
 | 仓库 | Stars | 维护者更新频率 | PR | 加的位置 | Merge 概率 |
 |------|-------|----------------|-----|---------|-----------|
 | rothgar/awesome-tuis | 19.3k | 活跃（最近 merge 6/3） | [#713](https://github.com/rothgar/awesome-tuis/pull/713) | Editors | 高 |
-| **agarrharr/awesome-cli-apps** | 19.7k | 很活跃（6/4~6/7 天天 merge） | [#1142](https://github.com/agarrharr/awesome-cli-apps/pull/1142) | Text Editors + Markdown | 中高 |
+| ~~agarrharr/awesome-cli-apps~~ | 19.7k | ~~很活跃（6/4~6/7 天天 merge）~~ | [#1142](https://github.com/agarrharr/awesome-cli-apps/pull/1142) | Text Editors + Markdown | ❌ 被关闭，无理由 |
 | thegdsks/awesome-modern-cli | 361 | 月更（最近 merge 5/6） | [#20](https://github.com/thegdsks/awesome-modern-cli/pull/20) | Text Editors | 高 |
 | **1c7/chinese-independent-developer** | **48.8k** | **很活跃（6/5~6/8 天天 merge）** | [**#975**](https://github.com/1c7/chinese-independent-developer/pull/975) | 程序员版面 | ✅ 已 merge（6/9） |
 | **521xueweihan/HelloGitHub** | **160k** | 月刊发布，审核周期 1-4 周 | [**Issue #3335**](https://github.com/521xueweihan/HelloGitHub/issues/3335) | Go 类目投稿 | 中高（需审核） |
