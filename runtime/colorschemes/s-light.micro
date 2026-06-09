@@ -48,7 +48,7 @@ color-link md-checkbox "#4271AE,#fffbee"            # ← 原 statement
 color-link md-link "#F5871F,#fffbee"                # ← 原 constant
 color-link md-image "#D33682,#fffbee"
 color-link md-url "#F5871F,#fffbee"                 # ← 原 constant
-color-link md-codeblock "#222222,#f0f3e8"           # ← 无语言代码块文字
-color-link md-frame "#d0d0d0,#fffbee"               # ← 新增（装饰边框）
-color-link md-frame-label "#8E908C,#fffbee"         # ← 新增（代码块语言名）
+color-link md-codeblock "#222222,#eeeee9"           # ← 无语言代码块文字
+color-link md-frame "#e0e0e0,#fffbee"               # ← 新增（装饰边框）
+color-link md-frame-label "#7090a0,#fffbee"         # ← 新增（代码块语言名）
 color-link md-misc "#3E999F,#fffbee"                # ← 原 preproc（特殊符号）

@@ -27,10 +27,10 @@ curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/master/install.sh
 
 | | microNeo | Micro / nano | glow / leaf | vim + plugins | GUI Editors |
 |--|:---------:|:-------------:|:------------:|:------------:|:-------------:|
-| **Editable** | ✓ | ✓ |   | ✓ | ✓ |
-| **Markdown Rendering** | ✓ |   | ✓ | ✓ | ✓ |
-| **Same Interface** | ✓ | - | - | ✗ (split) | ✗ (split) |
-| **Low Learning Curve** | ✓ | ✓ | ✓ | ✗ | ✓ |
+| Editable | ✓ | ✓ | ✗  | ✓ | ✓ |
+| Markdown Rendering | ✓ | ✗  | ✓ | ✓ | ✓ |
+| Same Interface | ✓ | - | - | ✗ (split) | ✗ (split) |
+| Low Learning Curve | ✓ | ✓ | ✓ | ✗ | ✓ |
 
 **microNeo = Micro's editing + Glow's rendering, in one window.**
 
@@ -41,6 +41,7 @@ curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/master/install.sh
 # Open any file
 microneo README.md
 ```
+
 
 ## Set as Default Editor
 ```bash
@@ -60,6 +61,9 @@ microNeo uses `$XDG_CONFIG_HOME/microNeo/` for config (defaults to `~/.config/mi
 }
 ```
 
+**Font**: 
+- A Nerd Font or similar powerline-compatible font is recommended. 
+- If the status separator `` looks broken, change `status-separator` in `~/.config/microNeo/settings.json` (e.g., to `│`).
 
 ## Hotkeys
 | Action | Shortcut | Action | Shortcut |
