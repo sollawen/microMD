@@ -13,7 +13,7 @@ color-link error "bold #FF4444,#fffbee"
 color-link todo "bold #FF8844,#fffbee"
 color-link hlsearch "#FFFFFF,#B4EC85"
 color-link statusline "#FFFFFF,#999999"
-color-link statusline.special "#1a1a2e,#ffd770"
+color-link statusline.special "#ffe740,#1a1a2e"
 color-link statusline.dim "#202020,#a9d9ff"
 color-link statusline.normal "#707070,#d0cab9"
 color-link message "#6090b0,#fffbee"
@@ -49,6 +49,6 @@ color-link md-link "#F5871F,#fffbee"                # ← 原 constant
 color-link md-image "#D33682,#fffbee"
 color-link md-url "#F5871F,#fffbee"                 # ← 原 constant
 color-link md-codeblock "#222222,#eeeee9"           # ← 无语言代码块文字
-color-link md-frame "#e0e0e0,#fffbee"               # ← 新增（装饰边框）
+color-link md-frame "#d8d8d8,#fffbee"               # ← 新增（装饰边框）
 color-link md-frame-label "#7090a0,#fffbee"         # ← 新增（代码块语言名）
 color-link md-misc "#3E999F,#fffbee"                # ← 原 preproc（特殊符号）
