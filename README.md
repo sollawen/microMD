@@ -27,10 +27,10 @@ curl -fsSL https://raw.githubusercontent.com/sollawen/microNeo/master/install.sh
 
 | | microNeo | Micro / nano | glow / leaf | vim + plugins | GUI Editors |
 |--|:---------:|:-------------:|:------------:|:------------:|:-------------:|
-| **Editable** | ✅ | ✅ | ❌ | ✅ | ✅ |
-| **Markdown Rendering** | ✅ | ❌ | ✅ | ✅ | ✅ |
-| **Same Interface** | ✅ | — | — | ❌ (split) | ❌ (split) |
-| **Low Learning Curve** | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Editable** | ✓ | ✓ |   | ✓ | ✓ |
+| **Markdown Rendering** | ✓ |   | ✓ | ✓ | ✓ |
+| **Same Interface** | ✓ | - | - | ✗ (split) | ✗ (split) |
+| **Low Learning Curve** | ✓ | ✓ | ✓ | ✗ | ✓ |
 
 **microNeo = Micro's editing + Glow's rendering, in one window.**
 

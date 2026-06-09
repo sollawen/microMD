@@ -805,7 +805,7 @@ func RenderTable(seg Segment, width int, cfg MDConfig) *RenderedSegment {
 	}
 
 	// 样式
-	contentStyle := cfg.Colorscheme.DefStyle
+	contentStyle := tcell.StyleDefault
 	borderStyle := resolveStyle(cfg.Colorscheme.Styles, "md-frame", cfg.Colorscheme.DefStyle)
 
 	// 4. 顶边框（可选）

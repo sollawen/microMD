@@ -13,7 +13,7 @@ color-link error "bold #FF4444,#fffbee"
 color-link todo "bold #FF8844,#fffbee"
 color-link hlsearch "#FFFFFF,#B4EC85"
 color-link statusline "#FFFFFF,#999999"
-color-link statusline.special "#ffffff,#706a50"
+color-link statusline.special "#1a1a2e,#ffd770"
 color-link statusline.dim "#202020,#a9d9ff"
 color-link statusline.normal "#707070,#d0cab9"
 color-link message "#6090b0,#fffbee"
@@ -42,7 +42,7 @@ color-link md-blockquote "#3e7d9f,#fffbee"          # ← 原 preproc
 color-link md-bold "#000000,#fffbee"                # ← 原 constant.string
 color-link md-italic "#000000,#fffbee"              # ← 原 default
 color-link md-strikethrough "#222222,#fffbee"       # ← 原 default
-color-link md-inline-code "#228a7b,#f0f0e5"         # ← 原 type 背景微调
+color-link md-inline-code "#228a7b,#fffff9"         # ← 原 type 背景微调
 color-link md-list "#4271AE,#fffbee"                # ← 原 statement
 color-link md-checkbox "#4271AE,#fffbee"            # ← 原 statement
 color-link md-link "#F5871F,#fffbee"                # ← 原 constant

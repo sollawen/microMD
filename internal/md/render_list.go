@@ -207,9 +207,9 @@ func RenderList(seg Segment, width int, cfg MDConfig) *RenderedSegment {
 	}
 
 	result := &RenderedSegment{}
-	style := cfg.Colorscheme.DefStyle
-	listStyle := resolveStyle(cfg.Colorscheme.Styles, "md-list", style)
-	checkboxStyle := resolveStyle(cfg.Colorscheme.Styles, "md-checkbox", style)
+	style := tcell.StyleDefault
+	listStyle := resolveStyle(cfg.Colorscheme.Styles, "md-list", cfg.Colorscheme.DefStyle)
+	checkboxStyle := resolveStyle(cfg.Colorscheme.Styles, "md-checkbox", cfg.Colorscheme.DefStyle)
 
 	for lineIdx, line := range lines {
 		// ── 解析 ──

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	runewidth "github.com/mattn/go-runewidth"
+	"github.com/mattn/go-runewidth"
 	"github.com/micro-editor/micro/v2/internal/buffer"
 	"github.com/micro-editor/micro/v2/internal/config"
 	"github.com/micro-editor/micro/v2/internal/md"
@@ -818,6 +818,7 @@ func (w *BufWindow) expandLineStyles(bufLine int, runeCount int, baseStyle tcell
 		}
 		charStyles[i] = curStyle
 	}
+
 	return charStyles
 }
 

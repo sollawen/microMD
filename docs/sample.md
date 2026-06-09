@@ -54,7 +54,7 @@ func main() {
 
 | Column A | Column B | Column C |
 |----------|----------|----------|
-| Data 1   | Data 2   | Data 3 is quite long |
+| Data 1   | Data 2   | Data 3 is `quite long` code |
 | Data 4   | Data 5   | Data 6 |
 | **Bold** | `Code`   | *Italic* |
 
@@ -62,7 +62,7 @@ func main() {
 # Blockquotes
 
 > Blockquote first line
-> Blockquote second line
+> Blockquote `second line`
 
 # Mixed Long Paragraph
 
