@@ -245,6 +245,9 @@ func NewNotePane() *NotePane {
 		buf = buffer.NewBufferFromString("", n.noteFile, buffer.BTDefault)
 	}
 
+	// Disable line numbers for NotePane
+	buf.SetOptionNative("ruler", false)
+
 	// Create BufWindow with initial position (will be adjusted in open())
 	win := display.NewBufWindow(0, 0, 80, n.height, buf)
 	win.SetHideStatusLine(true)
@@ -292,9 +295,9 @@ func (n *NotePane) open() {
 	notePaneBottomBorder := notePaneTopBorder + n.height + 1
 
 	// 3. If not enough space below, scroll the main editor up
-	screenHeight, _ := screen.Screen.Size()
-	if notePaneBottomBorder > screenHeight {
-		deficit := notePaneBottomBorder - screenHeight + 1
+	viewBottom := view.Y + view.Height
+	if notePaneBottomBorder > viewBottom {
+		deficit := notePaneBottomBorder - viewBottom + 2
 
 		// Safety constraint: don't scroll cursor above scrollmargin
 		scrollmargin := int(pane.Buf.Settings["scrollmargin"].(float64))
@@ -304,9 +307,11 @@ func (n *NotePane) open() {
 		}
 
 		if deficit > 0 {
-			view.StartLine = bw.Scroll(view.StartLine, -deficit)
-			// Recalculate after scroll
-			lowestRow = lowestRow - deficit
+			// Scroll view towards buffer end (+deficit), so cursor moves up on screen,
+			// making room for NotePane below the cursor.
+			view.StartLine = bw.Scroll(view.StartLine, deficit)
+			// Recalculate based on actual new scroll position
+			lowestRow = n.lowestCursorScreenRow(bw, view)
 			notePaneTopBorder = lowestRow + 1
 		}
 	}
