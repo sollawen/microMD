@@ -58,7 +58,6 @@ func hasCursorInside(seg md.Segment, cursors []*buffer.Cursor) bool {
 
 // renderSegmentMD 渲染单个 MD segment 到 screen。
 // 与 renderSegmentNative 对称：纯函数，渲染 + 返回 (newVY, rowBufLines)。
-// 不写 mdCache——由 displayBufferMD 主循环统一写。
 func (w *BufWindow) renderSegmentMD(
 	seg md.Segment, vY int,
 ) (newVY int, rowBufLines []int) {
@@ -703,8 +702,15 @@ func (w *BufWindow) displayBufferMD(editMode bool) {
 		visibleEnd = b.LinesNum() - 1
 	}
 
-	// 每帧清空 mdCache（防止无限增长）
-	w.mdCache = w.mdCache[:0]
+	// 懒分配：确保容量足够（resize 后 bufHeight 可能变化）
+	if cap(w.viewportRowBufLine) < bufHeight {
+		w.viewportRowBufLine = make([]int, bufHeight)
+	}
+	w.viewportRowBufLine = w.viewportRowBufLine[:bufHeight]
+	// 重置为 -2
+	for i := range w.viewportRowBufLine {
+		w.viewportRowBufLine[i] = -2
+	}
 
 	// 读 buffer 上的分类结果（事件驱动算好，content-static）
 	// 注意：非 MD 文件的 b.MDSegments 保持 nil，filterSegmentsToVisible 要处理 nil
@@ -723,12 +729,9 @@ func (w *BufWindow) displayBufferMD(editMode bool) {
 		} else {
 			vY, rowBufLines = w.renderSegmentMD(seg, vY)
 		}
-		// ★ mdCache 写入可见范围（不是 segment 完整范围）
-		w.mdCache = append(w.mdCache, md.SegmentMeta{
-			BufStartLine: seg.VisibleStart,
-			BufEndLine:   seg.VisibleEnd,
-			RowBufLines:  rowBufLines,
-		})
+		// ★ 写入扁平数组
+		startVY := vY - len(rowBufLines)
+		copy(w.viewportRowBufLine[startVY:vY], rowBufLines)
 	}
 
 	// 3. 填充剩余空间
@@ -823,31 +826,28 @@ func (w *BufWindow) expandLineStyles(bufLine int, runeCount int, baseStyle tcell
 }
 
 // screenOffsetToBufferLine 将屏幕行偏移（相对 viewport 顶部）映射为 buffer 行号。
-// 使用 mdCache.RowBufLines 直接查找，装饰行往后找第一个内容行。
+// 使用 viewportRowBufLine 直接查找，O(1)。
+// 装饰行（-1）和空白区域（-2）一视同仁：点击装饰行等于点击空白，返回 (0, false)。
 // 返回 (bufferLine, true) 表示成功映射，(0, false) 表示应回退原始 Scroll 逻辑。
 func (w *BufWindow) screenOffsetToBufferLine(screenOffset int) (int, bool) {
-	if len(w.mdCache) == 0 {
+	if screenOffset < 0 || screenOffset >= len(w.viewportRowBufLine) {
 		return 0, false
 	}
-	remaining := screenOffset
-	for _, meta := range w.mdCache {
-		if remaining >= len(meta.RowBufLines) {
-			remaining -= len(meta.RowBufLines)
-			continue
-		}
-		line := meta.RowBufLines[remaining]
-		if line >= 0 {
-			return line, true // 内容行，直接用
-		}
-		// 装饰行，往后找第一个内容行
-		for j := remaining + 1; j < len(meta.RowBufLines); j++ {
-			if meta.RowBufLines[j] >= 0 {
-				return meta.RowBufLines[j], true
-			}
-		}
-		// 后面没有了，用 segment 最后一行
-		return meta.BufEndLine, true
+	if w.viewportRowBufLine[screenOffset] >= 0 {
+		return w.viewportRowBufLine[screenOffset], true
 	}
-	// screenOffset 超出 mdCache 覆盖范围（点击到空白填充区域）
+	// 装饰行（-1）和空白区域（-2）一视同仁：没有对应 buffer 行
+	return 0, false
+}
+
+// bufferLineToScreenOffset 将 buffer 行号映射为 viewport 中对应的最后一个屏幕行。
+// 倒序遍历，第一个命中就是最大的 row。
+// 返回 (screenRow, true) 表示成功映射，(0, false) 表示该 buffer 行不在 viewport 内。
+func (w *BufWindow) bufferLineToScreenOffset(bufferLine int) (int, bool) {
+	for i := len(w.viewportRowBufLine) - 1; i >= 0; i-- {
+		if w.viewportRowBufLine[i] == bufferLine {
+			return i, true
+		}
+	}
 	return 0, false
 }

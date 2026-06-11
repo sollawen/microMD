@@ -32,9 +32,14 @@ type BufWindow struct {
 	drawDivider      bool
 
 	// MicroNeo: MD rendering support
-	mdConfig md.MDConfig    // MD 渲染配置
-	mdCache  []md.SegmentMeta // 上一帧检测的轻量元数据缓存
-	editMode bool           // Step 1.0：光标所在 segment 回退原生显示；Step 1.1 会接入键盘切换
+	mdConfig md.MDConfig // MD 渲染配置
+	// viewportRowBufLine[i] = viewport 第 i 个屏幕行对应的 buffer 行号
+	// -1 = 装饰行（代码块边框、表格分隔线等）
+	// -2 = 空白填充区域（buffer 内容不够填满 viewport）
+	// >=0 = 内容行对应的 buffer 行号
+	// 长度 = bufHeight，每帧 displayBufferMD 开始时重置
+	viewportRowBufLine []int
+	editMode bool // 光标所在 segment 回退原生显示
 }
 
 // NewBufWindow creates a new window at a location in the screen with a width and height
@@ -287,7 +292,7 @@ func (w *BufWindow) LocFromVisual(svloc buffer.Loc) buffer.Loc {
 
 	var sloc SLoc
 	if w.Buf.IsMD && w.mdConfig.MDRender {
-		// MicroNeo: 使用 mdCache 将屏幕 Y 偏移正确映射到 buffer 行（跳过装饰行）
+		// MicroNeo: 使用 viewportRowBufLine 将屏幕 Y 偏移映射到 buffer 行
 		if bufLine, ok := w.screenOffsetToBufferLine(svloc.Y - w.Y); ok {
 			sloc = SLoc{bufLine, 0} // 非softwrap模式下 Row=0
 		} else {
