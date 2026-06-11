@@ -158,8 +158,10 @@ func RenderCodeBlock(seg Segment, width int, cfg MDConfig) *RenderedSegment {
 	// ── 4. 判断是否闭合 ──
 	isClosed := len(lines) > 1 && isClosingFence(lines[len(lines)-1])
 
-	// ── 5. 顶边框 ──
-	result.Rows = append(result.Rows, makeTopBorder(lang, width, borderStyle, labelStyle))
+	// ── 5. 顶边框（开围栏是真实 buffer 行，用相对行号 0 = lines[0]） ──
+	topRow := makeTopBorder(lang, width, borderStyle, labelStyle)
+	topRow.BufLine = 0
+	result.Rows = append(result.Rows, topRow)
 
 	// ── 6. 代码内容行 ──
 	// 代码行范围：lines[1:n-1]（闭合时）或 lines[1:n]（未闭合时）
@@ -222,9 +224,11 @@ func RenderCodeBlock(seg Segment, width int, cfg MDConfig) *RenderedSegment {
 		}
 	}
 
-	// ── 7. 底边框（仅闭合时） ──
+	// ── 7. 底边框（仅闭合时，闭围栏是真实 buffer 行，用相对行号 len(lines)-1） ──
 	if isClosed {
-		result.Rows = append(result.Rows, makeBottomBorder(width, borderStyle))
+		bottomRow := makeBottomBorder(width, borderStyle)
+		bottomRow.BufLine = len(lines) - 1
+		result.Rows = append(result.Rows, bottomRow)
 	}
 
 	return result
