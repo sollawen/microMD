@@ -152,7 +152,7 @@ func (w *BufWindow) updateDisplayInfo() {
 	}
 
 	w.bufHeight = w.Height
-	if b.Settings["statusline"].(bool) || w.drawDivider {
+	if !w.hideStatusLine && (b.Settings["statusline"].(bool) || w.drawDivider) {
 		w.bufHeight--
 	}
 

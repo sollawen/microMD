@@ -278,46 +278,96 @@ func (n *NotePane) open() {
 		return
 	}
 
-	// Get the pane's view (screen coordinates)
+	// Get the pane's view and BufWindow
 	view := pane.BWindow.GetView()
+	bw := pane.BWindow.(*display.BufWindow)
 
-	// Get cursor position in buffer coordinates
-	cursor := pane.Buf.GetActiveCursor()
-	bufLoc := cursor.Loc
+	// 1. Find the lowest cursor/selection screen row
+	lowestRow := n.lowestCursorScreenRow(bw, view)
 
-	// Get view's scroll offset to calculate screen position
-	startLine := view.StartLine
-
-	// Calculate cursor's screen position
-	cursorScreenY := bufLoc.Y - startLine.Line + view.Y
-
-	// Position the NotePane below the cursor
+	// 2. Calculate NotePane position
 	n.x = view.X
-	n.y = cursorScreenY + 1
 	n.width = view.Width
+	notePaneTopBorder := lowestRow + 1
+	notePaneBottomBorder := notePaneTopBorder + n.height + 1
 
-	// If not enough space below, try to position above the cursor
+	// 3. If not enough space below, scroll the main editor up
 	screenHeight, _ := screen.Screen.Size()
-	if n.y+n.height+2 > screenHeight {
-		n.y = cursorScreenY - n.height - 2
-		if n.y < view.Y {
-			n.y = view.Y
+	if notePaneBottomBorder > screenHeight {
+		deficit := notePaneBottomBorder - screenHeight + 1
+
+		// Safety constraint: don't scroll cursor above scrollmargin
+		scrollmargin := int(pane.Buf.Settings["scrollmargin"].(float64))
+		maxDeficit := lowestRow - scrollmargin
+		if deficit > maxDeficit {
+			deficit = maxDeficit
+		}
+
+		if deficit > 0 {
+			view.StartLine = bw.Scroll(view.StartLine, -deficit)
+			// Recalculate after scroll
+			lowestRow = lowestRow - deficit
+			notePaneTopBorder = lowestRow + 1
 		}
 	}
 
-	// Reposition BufWindow to be inside the border
-	bw := n.BufPane.BWindow.(*display.BufWindow)
-	bw.X = n.x + 1
-	bw.Y = n.y + 1
+	// 4. Set NotePane position
+	n.y = notePaneTopBorder
+
+	// 5. Reposition BufWindow to be inside the border
+	nbw := n.BufPane.BWindow.(*display.BufWindow)
+	nbw.X = n.x + 1
+	nbw.Y = n.y + 1
 	n.BufPane.Resize(n.width-2, n.height)
 
 	n.isOpen = true
+}
+
+// locToScreenRow converts a buffer location to its screen row.
+// It correctly handles softwrap by using SLocFromLoc and Diff.
+func (n *NotePane) locToScreenRow(bw *display.BufWindow, view *display.View, loc buffer.Loc) int {
+	sloc := bw.SLocFromLoc(loc)
+	row := bw.Diff(view.StartLine, sloc)
+	return row + view.Y
+}
+
+// lowestCursorScreenRow finds the lowest screen row among all cursors and selections.
+// For cursors with selection, it uses the bottom of the selection (max Y).
+func (n *NotePane) lowestCursorScreenRow(bw *display.BufWindow, view *display.View) int {
+	lowestRow := -1
+
+	for _, cursor := range bw.Buf.GetCursors() {
+		var loc buffer.Loc
+		if cursor.HasSelection() {
+			// Use the selection endpoint with larger Y
+			sel := cursor.CurSelection
+			if sel[0].Y > sel[1].Y {
+				loc = sel[0]
+			} else {
+				loc = sel[1]
+			}
+		} else {
+			loc = cursor.Loc
+		}
+
+		screenRow := n.locToScreenRow(bw, view, loc)
+		if screenRow > lowestRow {
+			lowestRow = screenRow
+		}
+	}
+
+	return lowestRow
 }
 
 // close closes the NotePane and saves the file
 func (n *NotePane) close() {
 	n.BufPane.Buf.Save()
 	n.isOpen = false
+
+	// Restore main editor's normal scroll position
+	if pane := MainTab().CurPane(); pane != nil {
+		pane.BWindow.Relocate()
+	}
 }
 
 // HandleEvent handles keyboard events for the NotePane
@@ -335,6 +385,13 @@ func (n *NotePane) HandleEvent(event tcell.Event) {
 func (n *NotePane) Display() {
 	if !n.isOpen {
 		return
+	}
+
+	// Clear the entire NotePane area (border + content) to hide underlying editor content
+	for row := 0; row < n.height+2; row++ {
+		for col := 0; col < n.width; col++ {
+			screen.Screen.SetContent(n.x+col, n.y+row, ' ', nil, config.DefStyle)
+		}
 	}
 
 	// Box-drawing characters
