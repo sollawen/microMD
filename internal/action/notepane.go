@@ -307,11 +307,9 @@ func (n *NotePane) open() {
 		}
 
 		if deficit > 0 {
-			// Scroll view towards buffer end (+deficit), so cursor moves up on screen,
-			// making room for NotePane below the cursor.
+			oldStartLine := view.StartLine
 			view.StartLine = bw.Scroll(view.StartLine, deficit)
-			// Recalculate based on actual new scroll position
-			lowestRow = n.lowestCursorScreenRow(bw, view)
+			lowestRow -= bw.Diff(oldStartLine, view.StartLine)
 			notePaneTopBorder = lowestRow + 1
 		}
 	}
@@ -331,6 +329,11 @@ func (n *NotePane) open() {
 // locToScreenRow converts a buffer location to its screen row.
 // It correctly handles softwrap by using SLocFromLoc and Diff.
 func (n *NotePane) locToScreenRow(bw *display.BufWindow, view *display.View, loc buffer.Loc) int {
+	if bw.Buf.IsMD {
+		if offset, ok := bw.BufferLineToScreenOffset(loc.Y); ok {
+			return offset
+		}
+	}
 	sloc := bw.SLocFromLoc(loc)
 	row := bw.Diff(view.StartLine, sloc)
 	return row + view.Y
