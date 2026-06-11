@@ -840,10 +840,10 @@ func (w *BufWindow) screenOffsetToBufferLine(screenOffset int) (int, bool) {
 	return 0, false
 }
 
-// bufferLineToScreenOffset 将 buffer 行号映射为 viewport 中对应的最后一个屏幕行。
+// BufferLineToScreenOffset 将 buffer 行号映射为 viewport 中对应的最后一个屏幕行。
 // 倒序遍历，第一个命中就是最大的 row。
 // 返回 (screenRow, true) 表示成功映射，(0, false) 表示该 buffer 行不在 viewport 内。
-func (w *BufWindow) bufferLineToScreenOffset(bufferLine int) (int, bool) {
+func (w *BufWindow) BufferLineToScreenOffset(bufferLine int) (int, bool) {
 	for i := len(w.viewportRowBufLine) - 1; i >= 0; i-- {
 		if w.viewportRowBufLine[i] == bufferLine {
 			return i, true
