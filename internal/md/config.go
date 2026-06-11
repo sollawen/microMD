@@ -43,8 +43,6 @@ type MDConfig struct {
 	TabSize     int            // tab 宽度（BufPane 构造时从 buf.Settings 填入）
 	Buf         BufferReader   // ★ 渲染时由 display 层注入，不随 Segment 持久化
 
-	MDRender      bool    // 功能总开关
-	MDRenderIdle  float64 // 编辑模式超时秒数（Step 1 用）
 	MDTableAlign  bool    // 表格对齐
 	MDTableBorder bool    // 表格外框
 	MDBoldItalic  bool    // 加粗斜体渲染
@@ -57,8 +55,6 @@ type MDConfig struct {
 func DefaultMDConfig() MDConfig {
 	return MDConfig{
 		Colorscheme:  MDColorscheme{}, // 由 BufPane 构造时填入
-		MDRender:      true,
-		MDRenderIdle:  10,
 		MDTableAlign:  true,
 		MDTableBorder: true,
 		MDBoldItalic:  true,

@@ -299,7 +299,7 @@ func (w *BufWindow) LocFromVisual(svloc buffer.Loc) buffer.Loc {
 	}
 
 	var sloc SLoc
-	if w.Buf.IsMD && w.mdConfig.MDRender {
+	if w.Buf.IsMD {
 		// MicroNeo: 使用 viewportRowBufLine 将屏幕 Y 偏移映射到 buffer 行
 		if bufLine, ok := w.screenOffsetToBufferLine(svloc.Y - w.Y); ok {
 			sloc = SLoc{bufLine, 0} // 非softwrap模式下 Row=0
@@ -942,7 +942,7 @@ func (w *BufWindow) Display() {
 
 	w.displayStatusLine()
 	w.displayScrollBar()
-	if !w.Buf.IsMD || !w.mdConfig.MDRender {
+	if !w.Buf.IsMD {
 		w.displayBuffer()
 	} else {
 		w.displayBufferMD(w.editMode)

@@ -40,8 +40,6 @@ func initMDConfig(buf *buffer.Buffer, w *display.BufWindow) {
 			Styles:   config.Colorscheme,
 		},
 		TabSize:        util.IntOpt(buf.Settings["tabsize"]),
-		MDRender:       config.GetGlobalOption("mdrender").(bool),
-		MDRenderIdle:   config.GetGlobalOption("mdrenderidle").(float64),
 		MDTableAlign:   buf.Settings["mdtablealign"].(bool),
 		MDTableBorder:  buf.Settings["mdtableborder"].(bool),
 		MDBoldItalic:   buf.Settings["mdbolditalic"].(bool),
