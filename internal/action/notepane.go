@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,7 +25,6 @@ type NotePane struct {
 	x, y          int
 	width         int
 	height        int
-	noteFile      string
 	filePath      string       // main editor buffer.AbsPath
 	fileCursor    buffer.Loc   // captured cursor (X=col, Y=line)
 	fileSelection    *[2]buffer.Loc // nil = no selection
@@ -241,24 +239,11 @@ func NewNotePane() *NotePane {
 		height: 5,
 	}
 
-	// Set the notes file path
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = "/tmp"
-	}
-	n.noteFile = filepath.Join(homeDir, ".config", "microNeo", "notes.md")
+	// Create an in-memory scratch buffer. Content is discarded on close;
+	// see buffer.BTScratch ("Cannot save scratch buffer" in save.go:237).
+	buf := buffer.NewBufferFromString("", "", buffer.BTScratch)
 
-	// Ensure directory exists
-	dir := filepath.Dir(n.noteFile)
-	os.MkdirAll(dir, 0755)
-
-	// Load or create the buffer
-	buf, err := buffer.NewBufferFromFile(n.noteFile, buffer.BTDefault)
-	if err != nil {
-		buf = buffer.NewBufferFromString("", n.noteFile, buffer.BTDefault)
-	}
-
-	// Disable line numbers for NotePane
+	// Disable ruler for NotePane
 	buf.SetOptionNative("ruler", false)
 
 	// Create BufWindow with initial position (will be adjusted in open())
@@ -492,7 +477,6 @@ func (n *NotePane) lowestCursorScreenRow(bw *display.BufWindow, view *display.Vi
 
 // close closes the NotePane and saves the file
 func (n *NotePane) close() {
-	n.BufPane.Buf.Save()
 	n.isOpen = false
 
 	// Restore main editor's normal scroll position
