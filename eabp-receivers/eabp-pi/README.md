@@ -5,15 +5,22 @@ EABP (Embedded Agent Bridge Protocol) receiver extension for pi.
 ## 安装
 
 ```bash
-pi install /path/to/eabp-receivers/pi
+pi install /path/to/eabp-receivers/eabp-pi
 ```
 
-## 功能（M1 形态）
+## 功能
 
-- 启动时在 Unix socket 上监听来自 microNeo 的上下文通知
-- 按 `\n` 分帧解析 JSON 信封（EABP 协议）
-- 收到 `context` 报文后通过 `ctx.ui.notify()`展示来源/文件/行号/选区/消息
-- session 结束时自动清理 socket 和注册文件
+通过 Unix socket 接收 microNeo 发来的上下文通知，根据报文内容走两条递送路径：
+
+### 带 message 报文
+- 格式化上下文引用（`@<path> :line<focus>`）+ 用户消息
+- 调用 `pi.sendUserMessage(text, { deliverAs: "steer" })` 触发 LLM 对话
+- streaming 时自动排队，等当前回合工具链结束后插入
+
+### 纯上下文报文（无 message）
+- 格式化上下文引用
+- 调用 `ctx.ui.setEditorText(text)` 填入输入框
+- 用户手动发送后才进入 LLM（不自动触发）
 
 ## 协议版本
 
@@ -22,4 +29,4 @@ pi install /path/to/eabp-receivers/pi
 ## 相关文档
 
 - 协议详情：`docs/agent-comm/D2-通信协议方案.md`
-- 原型验证计划：`docs/agent-comm/D3-原型验证计划.md`
+- 实施计划：`docs/agent-comm/D5-pi接收端实施计划.md`

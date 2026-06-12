@@ -104,7 +104,7 @@ function onMessage(env: any, ctx: any) {
 ### 5.1 设计原则
 
 1. **`@path` 是世界通用约定**——所有 AI agent（Cursor / Claude / Copilot …）都认识，LLM 天然知道这是文件引用、会用 read 工具去读。pi 展不展开 `@` 无所谓（我们走 `sendUserMessage` / `setEditorText`，不在 CLI 展开路径上）——LLM 自己用工具读
-2. **` :line` 是行标注**——空格 + `:line12` 告诉 LLM「重点看第 12 行」；有选区时用 `:line12-20` 给范围。语法形如 GitHub 的 `#L12-L20`，LLM 熟悉
+2. **` :line` 是行标注**——空格 + `:line12` 告诉 LLM「重点看第 12 行」；有选区时用 `:line12-line20` 给范围。语法形如 GitHub 的 `#L12-L20`，LLM 熟悉
 3. **path 指向磁盘上已保存的文件**——它和用户在 notePane 里打的字是两回事。用户的字已作为 `message` 单独发过来；path 就是个稳定文件引用。存不存盘不是 agent 该操心的事（契约即「文件已存盘」，与 Cursor/Claude 的 `@` 一致）
 4. **不内联文件内容、不渲染 `selection.text`**——只给引用 + 行范围，让 LLM 自己 read。避免传输冗余 + 尊重「只递送事实」
 5. **不替 LLM 下结论**（D2 原则④）——给 path + 行 + message，不解读「这段代码意思是…」
@@ -118,7 +118,7 @@ function onMessage(env: any, ctx: any) {
 ```typescript
 function formatText(p: any): string {
   const focus = p.selection
-    ? `${p.selection.start.line}-${p.selection.end.line}`
+    ? `line${p.selection.start.line}-line${p.selection.end.line}`
     : `${p.cursor.line}`;
   const base = `@${p.path} :line${focus}`;
   return p.message ? `${base}\n\n${p.message}` : base;
@@ -130,7 +130,7 @@ function formatText(p: any): string {
 **有选区 + 有 message**（走 `sendUserMessage`）
 
 ```
-@/Users/me/a.md :line12-20
+@/Users/me/a.md :line12-line20
 
 这段内容感觉怪，帮我换个说法
 ```
@@ -146,7 +146,7 @@ function formatText(p: any): string {
 **有选区 + 无 message**（走 `setEditorText`）
 
 ```
-@/Users/me/a.md :line12-20
+@/Users/me/a.md :line12-line20
 ```
 
 **无选区 + 无 message**（走 `setEditorText`）

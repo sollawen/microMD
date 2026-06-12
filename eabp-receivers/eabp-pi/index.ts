@@ -4,12 +4,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 const PROTOCOL = "eabp-1";
-const WIDGET = "mnab";
 
 export default function (pi: ExtensionAPI) {
   let server: net.Server | null = null;
   let name = "", socketPath = "", regFile = "";
-  let pending: any = null;            // M2：纯上下文暂存
 
   function registryDir(): string {
     const override = process.env.MNAB_REG_DIR;
@@ -57,36 +55,32 @@ export default function (pi: ExtensionAPI) {
     }
     try { fs.unlinkSync(regFile); } catch {}
     try { fs.unlinkSync(socketPath); } catch {}
-    pending = null;
   });
 
   function handleLine(line: string, ctx: any) {
     let env: any;
     try { env = JSON.parse(line); } catch { return; }
     if (env.v !== 1 || env.type !== "context") return;   // §7.2 主版本校验
-    onContext(env, ctx);                                 // 传完整信封（M1 要读 sender）
+    onMessage(env, ctx);
   }
 
-  function onContext(env: any, ctx: any) {
-    const p = env.payload, s = env.sender;
-    // —— M1：纯 UI 展示 ——
-    const from = s?.instance ?? s?.name ?? "?";
-    const sel = p.selection ? ` [${p.selection.start.line}-${p.selection.end.line}]` : "";
-    const msg = p.message ? ` → "${p.message}"` : "";
-    ctx.ui.notify(`${from}: ${p.path}:${p.cursor?.line}${sel}${msg}`, "info");
-
-    // —— M2 增量（替换上面五行）：见 §七 ——
+  function formatText(p: any): string {
+    const focus = p.selection
+      ? `line${p.selection.start.line}-line${p.selection.end.line}`
+      : `${p.cursor.line}`;
+    const base = `@${p.path} :line${focus}`;
+    return p.message ? `${base}\n\n${p.message}` : base;
   }
 
-  // —— M2 增量：before_agent_start 注入纯上下文 ——
-  // pi.on("before_agent_start", async (_e, ctx) => {
-  //   if (!pending) return;
-  //   const block = formatContext(pending);
-  //   pending = null;
-  //   ctx.ui.setWidget(WIDGET, undefined);
-  //   return { message: { customType: "mnab-context", content: block, display: true } };
-  // });
+  function onMessage(env: any, ctx: any) {
+    const p = env.payload;
+    const text = formatText(p);
 
-  // —— M2 增量：/mnab 命令 ——
-  // pi.registerCommand("mnab", { ... });   // paste/send/discard/status
+    if (p.message) {
+      pi.sendUserMessage(text, { deliverAs: "steer" });
+    } else {
+      ctx.ui.setEditorText(text);
+      ctx.ui.notify(`📌 已放入输入框，可编辑后发送`, "info");
+    }
+  }
 }
