@@ -20,3 +20,4 @@ tools/build-date
 tools/info-plist
 tools/vscode-tests/
 *.hdr
+proto/bin/
