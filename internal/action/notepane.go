@@ -279,6 +279,18 @@ func (n *NotePane) open() {
 		return
 	}
 
+	// 兑现"打开 = 全新"承诺：关掉旧 buffer（如有），建新的
+	// close() 不再销毁 buffer（避免 BufPane.HandleEvent 内 nil 访问 panic）
+	// 这里统一处理"开新"
+	if n.BufPane.Buf != nil {
+		n.BufPane.Buf.Close()      // 从 OpenBuffers 移除 + 调 Fini 清理
+	}
+	buf := buffer.NewBufferFromString("", "", buffer.BTScratch)
+	buf.SetOptionNative("ruler", false)
+	nbw := n.BufPane.BWindow.(*display.BufWindow)
+	nbw.SetBuffer(buf)             // 切 BufWindow.Buf + 装 OptionCallback
+	n.BufPane.Buf = buf            // 同步 BufPane.Buf 引用
+
 	// Capture file path from the main editor buffer
 	n.filePath = pane.Buf.AbsPath
 
@@ -319,7 +331,6 @@ func (n *NotePane) open() {
 	n.y = notePaneTopBorder
 
 	// 5. Reposition BufWindow to be inside the border
-	nbw := n.BufPane.BWindow.(*display.BufWindow)
 	nbw.X = n.x + 1
 	nbw.Y = n.y + 1
 	n.BufPane.Resize(n.width-2, n.height)
@@ -475,7 +486,7 @@ func (n *NotePane) lowestCursorScreenRow(bw *display.BufWindow, view *display.Vi
 	return lowestRow
 }
 
-// close closes the NotePane and saves the file
+// close closes the NotePane
 func (n *NotePane) close() {
 	n.isOpen = false
 
