@@ -1,8 +1,10 @@
 # D7-notePane Buffer 生命周期实施计划
 
-> 本文档修补 D6 实施后暴露的设计漏洞：notePane 关闭后内容**还在内存**，下次打开能看到上次输入。修复方案：**close 时销毁 buffer**，让"buffer 生命周期跟 `isOpen` 绑定"。
+> 本文档修补 D6 实施后暴露的设计漏洞：notePane 关闭后内容**还在内存**，下次打开能看到上次输入。修复目标：**保证"打开 = 空白"**，同时避免破坏 micro 原生代码对 Buf 的访问假设。
 >
-> **范围**：仅 buffer 创建/销毁时序。**不做**动态行高、**不做**旧 `notes.md` 文件处理、**不**commit。
+> **版本**：v2（实施后修订）。v1 设计的 close 路径有 nil 访问 panic 漏洞，详见 §九。
+>
+> **范围**：仅 buffer 创建/销毁时序。**不做**动态行高、**不做**旧 `notes.md` 文件处理。
 
 ---
 
@@ -40,58 +42,62 @@ D6 当时在 §六 写过：
 
 "自然覆盖"是错的。`open()` 不重置 buffer，所以**没有自然覆盖**——而是"自然保留"。
 
-### 1.3 修复方案（最简版）
+### 1.3 修复方案（最终版）
 
-**核心原则**：**buffer 生命周期跟 `isOpen` 绑定**——`open` 之前/之后、`close` 之后/之前，buffer 状态正确。
+**核心原则**：**保证"打开 = 空白"**——每次 `open()` 创建一个全新的空 buffer，**不**依赖 `close()` 销毁。
 
 | 阶段 | 行为 | `n.BufPane.Buf` 引用状态 |
 |---|---|---|
-| `NewNotePane()` (启动时一次) | **不动**（D6 已建好正式 buffer） | 指向新 buffer（空 scratch） |
-| `open()` 开头 | `if n.BufPane.Buf == nil` → 创建新 buffer | **首次** = 复用（`!= nil`，不走重建）；**后续** = nil → 新 buffer |
-| `close()` 末尾 | `Buf.Close()` + 置 nil | nil（GC 候选） |
+| `NewNotePane()` (启动时一次) | **不动**（D6 已建好正式 buffer） | 指向新 buffer A（空 scratch） |
+| `open()` 开头 | **总是** Close 旧 buffer（如有）+ NewBufferFromString + SetBuffer | 总是指向新 buffer |
+| `close()` 末尾 | **不动 Buf** | 保持原引用（不 panic） |
 
-**关键设计**：
+**关键设计（v2 修正）**：
 
-- **NewNotePane 不动**——D6 已建好正式 buffer，D7 不动
-- **open 路径统一**为 `if nil 就创建`——首次和后续写法一致，**首次因 != nil 自动复用**（设计正确，不是 bug）
-- **close 销毁**——`Buf.Close()` 从 OpenBuffers 移除，引用置 nil 让 GC 回收
-- **整体改动**：open 加 9 行（8 行逻辑 + 1 行注释块）+ close 加 5 行（2 行逻辑 + 3 行注释）= **净 +14 行**
+- **NewNotePane 不动**——D6 已建好正式 buffer
+- **open 路径** 总是 Close 旧 + 建新——**首次**会 Close 掉 NewNotePane 留的 buffer A（"浪费"一个空 buffer，**无副作用**）；**后续**每次都是空白
+- **close 路径不动 Buf**——避开 `BufPane.HandleEvent` 后续访问 h.Buf 的 nil panic
+- **整体改动**：open 加 ~10 行（Close 旧 + SetBuffer 新）+ close 减 5 行（D7 v1 加的 set-nil 块被删）= **净 ~+5 行**
+
+**为什么 close 不动 Buf？**——详细论证见 §2.1 和 §九。简单说：v1 设计让 close 设 `Buf = nil`，但 close 是从 `NotePaneSend` action handler 内部被调的，**handler 返回后** `BufPane.HandleEvent` 还会继续走到 `h.Buf.MergeCursors()`（bufpane.go:506）——访问 nil → panic。
 
 ---
 
 ## 二、核心决策
 
-### 2.1 close 时：用 `Buffer.Close()` 销毁
+### 2.1 close 时：**不**动 Buf
 
-`internal/buffer/buffer.go:533-555`：
+**关键发现**（v1 实施后 panic 暴露的）：
 
-| 方法 | 从 OpenBuffers 移除 | 调 Fini 清理 | 适用场景 |
-|---|---|---|---|
-| `Close()` (line 533) | ✅ | ✅ | **notePane 关闭用这个** |
-| `Fini()` (line 547) | ❌ | ✅ | 已有 buffer 想清理但不从列表移除 |
+`n.close()` 是从 `NotePaneSend` action handler **内部**被调的——`NotePaneSend` 走的是 `BufPane.HandleEvent` 调用栈，handler 返回后 `BufPane.HandleEvent` 还会**继续走**到 `bufpane.go:506` 调 `h.Buf.MergeCursors()` 统一清理。
 
-D7 用 `Close()`，**完整清理**：
-- 从 `OpenBuffers` 列表移除
-- 触发 Fini() 内部的清理逻辑（CancelBackup 等）
-- GC 可立即回收（前提是 `n.BufPane.Buf = nil` 解绑引用）
+**v1 设计的"close 设 `Buf = nil`"** 在这个时序下导致 nil 访问 panic。
 
-### 2.2 open 时：先 `NewBufferFromString` 创建新 buffer，再用 `SetBuffer` 切换 BufWindow
+**v2 修正**：`close()` 完全不动 Buf——只设 `isOpen = false` + 主编辑器 Relocate。`n.BufPane.Buf` 引用保持，BufPane 后续访问安全。
 
-D7 的 open 重建走**两步路径**：
+**这不影响"打开 = 空白"承诺**——空白由 `open()` 总是建新 buffer 来保证（见 §2.2）。
+
+### 2.2 open 时：总是 Close 旧 buffer（如有）+ 新建
 
 ```go
-if n.BufPane.Buf == nil {
-    buf := buffer.NewBufferFromString("", "", buffer.BTScratch)  // 第 1 步：建新 buffer
-    buf.SetOptionNative("ruler", false)
-    nbw := n.BufPane.BWindow.(*display.BufWindow)
-    nbw.SetBuffer(buf)            // 第 2 步：切 BufWindow.Buf + 装 OptionCallback/设 GetVisualX
-    n.BufPane.Buf = buf           // 同步 BufPane.Buf 引用
+// 兑现"打开 = 全新"承诺：关掉旧 buffer（如有），建新的
+if n.BufPane.Buf != nil {
+    n.BufPane.Buf.Close()        // 从 OpenBuffers 移除 + 调 Fini 清理
 }
+buf := buffer.NewBufferFromString("", "", buffer.BTScratch)
+buf.SetOptionNative("ruler", false)
+nbw := n.BufPane.BWindow.(*display.BufWindow)
+nbw.SetBuffer(buf)               // 切 BufWindow.Buf + 装 OptionCallback
+n.BufPane.Buf = buf              // 同步 BufPane.Buf 引用
 ```
 
-**为什么需要两步而不是只调 `NewBufferFromString` 然后赋值？**——`SetBuffer()` 在 BufWindow 内部会**装 `OptionCallback`**（处理 softwrap/wordwrap/diffgutter/ruler/scrollbar/statusline 变化，自动 Relocate）和**设 `GetVisualX`**。**不调 `SetBuffer()`，BufWindow 内部状态会不完整**——后续任何 buffer 配置变化都不会自动触发 UI 更新。
+**为什么用 `Close()` 而不是 `Fini()`？**——`Close()` 从 `OpenBuffers` 移除 buffer，是"彻底关闭"；`Fini()` 只清理 Serialise/Backup，不从列表移除。notePane 关闭后不需要这个 buffer 在 OpenBuffers 里。
 
-**BufWindow.Buf 是独立引用**：BufWindow struct 里 `Buf *buffer.Buffer`（bufwindow.go:24）是独立于 `BufPane.Buf` 的字段。`SetBuffer()` 内部会设 `w.Buf = b`，所以两步路径**只需要调一次** `SetBuffer()` 就把 BufWindow.Buf 切到新 buffer 了。
+**为什么"总是建新"而不是"复用 + 清空"？**——micro 原生 Buffer API 没有"清空内容"方法（Replace + 重建 cursor 复杂且有边界 bug）。**新建**路径简单可靠，**性能可忽略不计**（open 不是热路径）。
+
+**为什么 NewBufferFromString 之后还要 SetBuffer？**——`SetBuffer()` 在 BufWindow 内部会**装 `OptionCallback`**（处理 softwrap/wordwrap/diffgutter/ruler/scrollbar/statusline 变化，自动 Relocate）和**设 `GetVisualX`**。不调 `SetBuffer()`，BufWindow 内部状态会不完整——后续任何 buffer 配置变化不会自动触发 UI 更新。
+
+**BufWindow.Buf 是独立引用**：BufWindow struct 里 `Buf *buffer.Buffer`（bufwindow.go:24）是独立于 `BufPane.Buf` 的字段。`SetBuffer()` 内部会设 `w.Buf = b`，所以一次 `SetBuffer()` 同时切 BufWindow.Buf + 装回调，**再手动同步** `n.BufPane.Buf`。
 
 ### 2.3 `NewNotePane()` 不动
 
@@ -99,41 +105,22 @@ D7 **不改** `NewNotePane()`：
 
 - 它的角色是"启动时创建初始 TheNotePane"
 - 创建路径已经走 `BTScratch`、已经过 D6 验证
-- NewNotePane 时 buffer **留**在那里（不是 nil）
-- 首次 open 触发 `if nil` 判断时**自然跳过**（因为 != nil）
+- v2 设计里 NewNotePane 留的 buffer A **首次 open 会被 Close 掉**——但这是无副作用的浪费（空的 scratch buffer），行为正确
+- 跟"open 总是重建"逻辑**不冲突**——open 路径不依赖 buffer 是否存在
 
-**为什么"留 buffer"是 OK 的而不是 hack？**
+### 2.4 close 路径上 BufPane 引用关系
 
-- 启动时 buffer 是**空的**——用户看不到任何"残留"
-- 首次 open 显示空 buffer，行为正确
-- 跟"close 销毁"逻辑**不冲突**——close 之后才需要"重建"
-
-### 2.4 两处独立引用都要处理
-
-引用关系：
+`close()` 不动 Buf——BufPane 引用关系保持原样：
 
 ```
 NotePane
   └─ *BufPane
-       ├─ Buf *buffer.Buffer     ← D7 要管（设新 / 置 nil）
+       ├─ Buf *buffer.Buffer     ← close 时不动，open 时由 SetBuffer 切到新 buffer
        └─ *BufWindow
-            └─ Buf *buffer.Buffer ← D7 要管（SetBuffer 切换 / 自动随 SetBuffer 变）
+            └─ Buf *buffer.Buffer ← close 时不动，open 时由 SetBuffer 切到新 buffer
 ```
 
-**close 时**：
-```go
-n.BufPane.Buf.Close()    // 销毁（从 OpenBuffers 移除 + 清理）
-n.BufPane.Buf = nil      // 防 dangling 引用
-```
-
-**open 时**：
-```go
-buf := buffer.NewBufferFromString("", "", buffer.BTScratch)
-buf.SetOptionNative("ruler", false)
-nbw := n.BufPane.BWindow.(*display.BufWindow)
-nbw.SetBuffer(buf)        // 切 BufWindow.Buf
-n.BufPane.Buf = buf       // 同步 BufPane.Buf 引用
-```
+**close 后到下次 open 之前**：`n.BufPane.Buf` 和 `n.BufPane.BWindow.Buf` 都还引用着上一次 SetBuffer 设的 buffer（已被 Close）。**安全**——Close() 后的 buffer 仍是个有效 struct，其内部字段（cursors、text）未清空，BufPane 内部访问不会 panic。
 
 ---
 
@@ -143,25 +130,9 @@ n.BufPane.Buf = buf       // 同步 BufPane.Buf 引用
 
 只改 `internal/action/notepane.go`。
 
-### 3.2 改动 1：`close()` 加销毁逻辑（notepane.go:479）
+### 3.2 改动 1：`close()` — **删除** v1 加的 set-nil 块（还原 D6 之前）
 
-**改前**（notepane.go:478-486，D6 实施后状态）：
-
-```go
-// close closes the NotePane
-func (n *NotePane) close() {
-    n.isOpen = false
-
-    // Restore main editor's normal scroll position
-    if pane := MainTab().CurPane(); pane != nil {
-        pane.BWindow.Relocate()
-    }
-}
-```
-
-> 注：notepane.go:478 原注释为 `// close closes the NotePane and saves the file`，D6 删了 `Buf.Save()` 调用但**未更新注释**——D7 改前先把注释改为 `// close closes the NotePane`，再实施 D7 改后代码。
-
-**改后**：
+**改前**（v1 实施后状态，已含 v1 加的代码）：
 
 ```go
 // close closes the NotePane
@@ -181,26 +152,27 @@ func (n *NotePane) close() {
 }
 ```
 
-**净变化**：+5 行（2 行逻辑 + 3 行注释）
-
-### 3.3 改动 2：`open()` 开头加重建逻辑（notepane.go:275）
-
-**改前**（notepane.go:275-283）：
+**改后**（v2 — 删除 set-nil 块）：
 
 ```go
-func (n *NotePane) open() {
-    // Get the current active BufPane
-    pane := MainTab().CurPane()
-    if pane == nil {
-        return
-    }
+// close closes the NotePane
+func (n *NotePane) close() {
+    n.isOpen = false
 
-    // Capture file path from the main editor buffer
-    n.filePath = pane.Buf.AbsPath
-    ...
+    // Restore main editor's normal scroll position
+    if pane := MainTab().CurPane(); pane != nil {
+        pane.BWindow.Relocate()
+    }
+}
 ```
 
-**改后**：
+**净变化**：-6 行（删 1 行 if 头 + 2 行逻辑 + 1 行闭合 + 1 行空行 + 1 行注释）
+
+**为什么 v1 的 `Buf.Close()` 也一起删了？**——close 路径上 Buf 引用还活着，Close() 之后 `n.BufPane.Buf` 指向已 Close 的 buffer 没问题。**`Close()` 移到 open 路径**（见 §3.3），统一在 open 时清理。
+
+### 3.3 改动 2：`open()` 开头加"总是 Close 旧 + 新建"逻辑（notepane.go:275）
+
+**改前**（v1 实施后状态）：
 
 ```go
 func (n *NotePane) open() {
@@ -226,7 +198,36 @@ func (n *NotePane) open() {
     ...
 ```
 
-**净变化**：+9 行（8 行逻辑 + 1 行注释块）
+**改后**（v2 — 总是 Close 旧 + 新建）：
+
+```go
+func (n *NotePane) open() {
+    // Get the current active BufPane
+    pane := MainTab().CurPane()
+    if pane == nil {
+        return
+    }
+
+    // 兑现"打开 = 全新"承诺：关掉旧 buffer（如有），建新的
+    // close() 不再销毁 buffer（避免 BufPane.HandleEvent 内 nil 访问 panic）
+    // 这里统一处理"开新"
+    if n.BufPane.Buf != nil {
+        n.BufPane.Buf.Close()      // 从 OpenBuffers 移除 + 调 Fini 清理
+    }
+    buf := buffer.NewBufferFromString("", "", buffer.BTScratch)
+    buf.SetOptionNative("ruler", false)
+    nbw := n.BufPane.BWindow.(*display.BufWindow)
+    nbw.SetBuffer(buf)             // 切 BufWindow.Buf + 装 OptionCallback
+    n.BufPane.Buf = buf            // 同步 BufPane.Buf 引用
+
+    // Capture file path from the main editor buffer
+    n.filePath = pane.Buf.AbsPath
+    ...
+```
+
+**净变化**：v1 的 `if Buf == nil` 改成 `if Buf != nil { Close }`，多 1 行 + 注释更新
+
+**顺带修一处 v1 编译问题**：v1 open 重建块已经声明了 `nbw`，但 open 函数下面 `Reposition BufWindow` 那段又重复声明了 `nbw :=` 导致编译失败。v2 删掉重复声明，直接复用上面的 `nbw`。
 
 ### 3.4 不改的东西
 
@@ -240,7 +241,7 @@ func (n *NotePane) open() {
 | `internal/display/bufwindow.go` | `SetBuffer()` 行为符合预期，不改 |
 | micro 任何原生代码 | 项目规则：侵入最小化 |
 
-### 3.5 关键时序图
+### 3.5 关键时序图（v2）
 
 ```
 启动
@@ -250,59 +251,64 @@ NewNotePane() → 创建 buffer A（空 scratch，留着）  [D6 行为，D7 不
 Alt-i #1
   ↓
 open() #1
-  ├─ n.BufPane.Buf != nil（A 还在）→ 跳过重建  ← 首次 open 跳过（这是设计）
+  ├─ n.BufPane.Buf != nil（A 还在）→ A.Close()           ← 关闭 NewNotePane 留的 buffer
+  ├─ buf = NewBufferFromString + SetOptionNative("ruler") ← 创建新 buffer B
+  ├─ nbw.SetBuffer(B)         ← 切 BufWindow.Buf + 装 OptionCallback
+  ├─ n.BufPane.Buf = B        ← 同步 BufPane.Buf 引用
   ├─ 算位置、捕获主编辑器上下文
-  └─ 显示空 buffer A
+  └─ 显示空白 buffer B
   ↓
-用户输入内容 → buffer A 持有内容
+用户输入内容 → buffer B 持有内容
   ↓
 Alt-Enter 发送
   ↓
-NotePaneSend() → 读 buffer A 内容发送 → close()
+NotePaneSend() → 读 buffer B 内容发送 → close()
   ↓
 close() #1
   ├─ n.isOpen = false
-  ├─ A.Close()         ← 从 OpenBuffers 移除
-  ├─ A = nil            ← BufPane.Buf 引用 = nil
-  └─ 主编辑器 Relocate
+  └─ 主编辑器 Relocate        ← **不** 动 Buf（B 引用保持，BufPane.HandleEvent 后续访问安全）
   ↓
-buffer A 进入 GC 候选
+B 仍被 n.BufPane 引用，结构体未 GC
   ↓
 Alt-i #2
   ↓
 open() #2
-  ├─ n.BufPane.Buf == nil → 重建 buffer B    ← 这次走重建分支
-  ├─ nbw.SetBuffer(B)    ← BufWindow.Buf 切换
-  ├─ n.BufPane.Buf = B   ← BufPane.Buf 引用同步
+  ├─ n.BufPane.Buf != nil（B 还在）→ B.Close()           ← 关闭旧 buffer
+  ├─ buf = NewBufferFromString + SetOptionNative("ruler") ← 创建新 buffer C
+  ├─ nbw.SetBuffer(C)         ← 切 BufWindow.Buf
+  ├─ n.BufPane.Buf = C        ← 同步 BufPane.Buf 引用
   ├─ 算位置、捕获主编辑器上下文
-  └─ 显示空白 buffer
+  └─ 显示空白 buffer C
   ↓
-用户输入新内容 → buffer B 持有新内容
+用户输入新内容 → buffer C 持有新内容
   ...
 ```
 
-**关键观察**：
+**关键观察（v2）**：
 
-- **首次 open 跳过重建**（因为 NewNotePane 时已创建，引用非 nil）——这是设计，不是 bug
-- **后续每次 open 都重建**（因为 close 置 nil）
-- 行为对称：close 销毁 ↔ open 重建
-- **NewNotePane 完全不动**——这是改动最小的关键
+- **close 路径完全不动 Buf**——`n.BufPane.Buf` 引用保持，BufPane.HandleEvent 后续访问 h.Buf 不会 nil panic
+- **open 路径总是 Close 旧 + 建新**——保证"打开 = 空白"（不论首次还是后续）
+- **每次 open 都新建 buffer**——NewNotePane 留的 buffer 首次 open 就被 Close 掉（一次性浪费，**无副作用**）
+- 行为对称性体现在 open 端：每次都是"关掉旧的，建新的"——而 close 端**不**有"销毁"动作
 
 ---
 
 ## 四、风险与验证
 
-### 4.1 风险评估
+### 4.1 风险评估（v2）
 
 | 风险 | 等级 | 缓解 |
 |---|---|---|
 | `Buffer.Close()` 副作用未知 | **极低** | micro 所有 buffer 关闭都走它，notePane 用 BTScratch 无特殊行为 |
 | `BufWindow.SetBuffer()` 漏装回调 | 极低 | Lisa 调研确认（`bufwindow.go:53-70`）会装 OptionCallback + GetVisualX |
-| `n.BufPane.Buf = nil` 后意外访问 | 极低 | `micro.go:499` 的 Display 在 `IsOpen() == true` 时才调，nil 时不可见；`NotePaneSend()` 也只在 isOpen 时触发 |
-| `OpenBuffers` 列表残留 | 极低 | `Close()` 明确从列表移除 |
+| **`BufPane.HandleEvent` 内 nil 访问** | **已消除** | v2 close 路径**不**动 Buf，h.Buf 引用保持 |
+| `OpenBuffers` 列表残留 | 极低 | `Close()` 在 open 路径上明确从列表移除 |
 | `BufWindow.Buf` 残留 stale 引用 | 极低 | 下次 open 调 `SetBuffer()` 会自动覆盖；不需要手动清 |
-| 编译失败 | 极低 | 改动只加代码，不删/重命名 |
-| 行为回归（user-visible 异常） | 低 | 详见 §4.2 验证步骤 5/6 |
+| 每次 open 都新建 buffer（性能） | **极低** | open 不是热路径，buffer 构造开销 <1ms |
+| 多次 `SetBuffer()` 反复装回调 | 极低 | SetBuffer 幂等，装 OptionCallback 内部用覆盖/重建 |
+| NewNotePane 留的 buffer 首次 open 被 Close 掉（浪费） | **极低** | 一次性空 scratch buffer 的 Close 几乎零开销 |
+| 编译失败 | 极低 | 改动只改逻辑，不改类型/重命名；v1 顺带修复的 nbw 重复声明也消除了 |
+| 行为回归（user-visible 异常） | 低 | 详见 §4.2 验证步骤 |
 
 ### 4.2 验证步骤
 
@@ -385,11 +391,11 @@ grep -n "Buf\.Close()\|nbw\.SetBuffer" /Users/sollawen/pi-dev/microNeo/internal/
 
 ---
 
-## 七、变更摘要
+## 七、变更摘要（v2）
 
 | 维度 | 改动 |
 |---|---|
-| **代码** | 1 个文件（`notepane.go`），2 处改动（`close` + `open`），净 +14 行 |
+| **代码** | 1 个文件（`notepane.go`），2 处改动（`close` + `open`），净 **+5 行**（v1 写的是 +14，实际差 9 行——v2 删了 v1 加的 set-nil 块，多出的 buffer 重建代码在 open 端） |
 | **micro 原生代码** | 零侵入 |
 | **EABP 协议** | 不变 |
 | **D6 计划** | D6 §六 后续工作 D11 的"单例复用不必清理"判断**作废** |
@@ -404,15 +410,131 @@ grep -n "Buf\.Close()\|nbw\.SetBuffer" /Users/sollawen/pi-dev/microNeo/internal/
 
 | 议题 | 后续文档 | 备注 |
 |---|---|---|
-| D6 §六 后续工作 D11 的"自然覆盖"判断 | 本 D7 已修正 | 把 D6 §六 那段从"下次打开自然覆盖"改为"**D7：close 销毁 + open 重建（详见 D7 §三）**" |
+| D6 §六 后续工作 D11 的"自然覆盖"判断 | 本 D7 已修正 | D6 §六 那段从"下次打开自然覆盖"改为"**D7 v2：close 不动 Buf + open 总是 Close 旧 + 新建（详见 D7 §三）**" |
 | 旧 `notes.md` 文件处理 | D8? | 选项：自动归档 / 启动时提示 / 完全不管 |
 | 产品文档同步 | D9? | D0 §六 改一行（"内容不持久化，关闭即销毁"）；用户界面-V2.md 改意象描述 |
 | 动态行高 | D7+1? | 5-10 行自适应（边界处理：浮窗越界时向上扩展） |
+| Receiver 退出清理 socket 文件 | 单独 | 17 个孤儿 .sock 残留的清理策略 |
+| `SetBuffer()` 多次调用对 BufWindow 状态的影响 | 调研 | 当前未观察到问题，但没审计过 OptionCallback 的"重装"语义 |
 
 ---
 
-**预计工作量**：单文件改动，5 分钟实施 + 10 分钟验证 + 0 commit。
+## 九、实施回顾（v2 修订记录）
 
-**风险等级**：极低。改动加法、API 现成（`Buffer.Close` / `BufWindow.SetBuffer` 都在用）、行为对称（close 销毁 ↔ open 重建）。
+> 本节记录 v1 设计的问题、修复方案、commit hash——给将来 reviewer 和 v3 维护者参考。
 
-**改动最小**：D7 实际只动 open/close 两个函数，NewNotePane 完全不动——这是 D6 已经准备好的最干净基础。
+### 9.1 v1 设计回顾
+
+v1 在 D7 文档里的设计是：
+
+| 阶段 | 行为 |
+|---|---|
+| `NewNotePane()` | 留 buffer A（!= nil） |
+| `open()` | `if Buf == nil` → 重建（BTScratch） |
+| `close()` | `Buf.Close() + Buf = nil` |
+
+**理论逻辑**：close 销毁 buffer → 引用 = nil → 下次 open 触发 if nil 重建。
+
+### 9.2 v1 实施后的 panic
+
+v1 commit (未独立 commit——直接在 D7 修复 commit `67ec2858` 之前的某次 working tree 状态) 实施后，用户报告：
+
+```
+Micro encountered an error: runtime.errorString runtime error: invalid memory address or nil pointer dereference
+runtime/panic.go:336
+github.com/micro-editor/micro/v2/internal/buffer/buffer.go:1101
+github.com/micro-editor/micro/v2/internal/action/bufpane.go:506
+github.com/micro-editor/micro/v2/internal/action/notepane.go:513
+github.com/micro-editor/micro/v2/cmd/micro/micro.go:558
+```
+
+### 9.3 根因分析
+
+**调用链**（Alt+Enter 发送时）：
+
+```
+micro.go:558  TheNotePane.HandleEvent(event)       ← IsOpen() 守门通过
+notepane.go:513  n.BufPane.HandleEvent(event)      ← 转发，无 isOpen 检查
+bufpane.go:337  config.RunPluginFnBool(...)        ← 按 binding 查 Alt+Enter → 调 NotePaneSend
+notepane.go (NotePaneSend 内部)  →  n.close()  →  n.isOpen=false, n.BufPane.Buf=nil
+bufpane.go:506  h.Buf.MergeCursors()               ← panic：h.Buf 是 nil
+```
+
+**关键时序**：
+
+`n.close()` 是在 `BufPane.HandleEvent` **调用栈内部**被 `NotePaneSend` 调用的。`NotePaneSend` 返回后，**`BufPane.HandleEvent` 还没退出**——它会继续走到 line 506 调 `h.Buf.MergeCursors()` 统一清理。
+
+v1 的设计假设是 "close() 是个干净的同步点，close 之后不会有任何代码访问 h.Buf"——**这个假设错了**。
+
+### 9.4 v1 设计还有第二个问题
+
+v1 改动 1 的注释写"GC 可回收"——**这个说法也是错的**。`n.BufPane` 这个 struct 还在 `TheNotePane.BufPane` 字段里引用着，**`n.BufPane.Buf = nil` 对 GC 没用**（Buf 引用还通过 n.BufPane 间接活着）。
+
+**所以"set nil"既不能 GC 回收，又会引发 panic**——双重失败。
+
+### 9.5 v2 修复方案
+
+**改动 1：close() 还原成 D6 之前（删除 v1 加的 set-nil 块）**
+
+```go
+func (n *NotePane) close() {
+    n.isOpen = false
+    if pane := MainTab().CurPane(); pane != nil {
+        pane.BWindow.Relocate()
+    }
+}
+```
+
+**改动 2：open() 的 if nil 改成 if != nil { Close } + 总是新建**
+
+```go
+if n.BufPane.Buf != nil {
+    n.BufPane.Buf.Close()
+}
+buf := buffer.NewBufferFromString("", "", buffer.BTScratch)
+buf.SetOptionNative("ruler", false)
+nbw := n.BufPane.BWindow.(*display.BufWindow)
+nbw.SetBuffer(buf)
+n.BufPane.Buf = buf
+```
+
+**顺带修**：v1 编译失败（`nbw` 重复声明）——v2 open 重建块已声明 nbw，line 334 `nbw :=` 删掉，直接复用。
+
+### 9.6 v1 vs v2 对比
+
+| 维度 | v1 | v2 |
+|---|---|---|
+| close 是否动 Buf | Close() + set nil | **不动** |
+| open 重建条件 | if Buf == nil | **总是 Close 旧 + 新建** |
+| close → open 之间 Buf 状态 | nil（**panic 风险**） | 旧 buffer 引用保持（**安全**） |
+| 能否保证"打开 = 空白" | ✅（首次/后续都通过 if nil 触发） | ✅（**总是新建**） |
+| 性能 | 首次 open 跳过重建（复用 NewNotePane 留的） | 每次 open 都 Close + 新建 |
+| 行为对称性 | close 销毁 ↔ open 重建 | open 端独大："关旧 + 开新" |
+| 改 close 路径的 panic 风险 | **有**（已验证触发） | **无** |
+
+**v2 的代价**：每次 open 多做一次 Close + NewBufferFromString（约 0.5ms）。**完全可接受**。
+
+### 9.7 commit hash
+
+| 事件 | commit | message |
+|---|---|---|
+| D7 文档初版（含 v1 设计） | `19e22f2d` | `docs(agent-comm): add D6 and D7 plans for notePane buffer refactor` |
+| **v2 修复**（含代码） | `67ec2858` | `fix(notepane): prevent nil panic in BufPane.HandleEvent after close` |
+| D7 文档 v2 修订（**本次**） | 待 commit | `docs(agent-comm): align D7 with v2 fix — close 路径不变，open 总是重建` |
+
+### 9.8 给将来维护者的提示
+
+- **不要轻信"close 销毁 = GC 回收"**——BufPane 引用 Buf 路径上还有活引用
+- **不要在 action handler 内部对 BufPane 状态做"假设不会再被访问"的修改**——BufPane.HandleEvent 在 handler 返回后还会继续走清理逻辑
+- **open 路径的"总是重建"看似浪费**——但比"按需重建 + close 路径上小心的状态管理"安全得多
+- **micro 原生代码 `h.Buf.MergeCursors()` 这类末尾清理**是隐式假设"Buf 一直存在"——破坏这个假设的 PR 要小心
+
+---
+
+**预计工作量**：v2 实施 5 分钟 + 验证 10 分钟 + 文档修订 5 分钟。
+
+**风险等级**：极低。v2 改回 v1 之前的 close 行为（安全），open 端加的"总是重建"是加法（不破坏既有）。
+
+**改动最小**：D7 v2 实际只动 open/close 两个函数，NewNotePane 完全不动——这是 D6 已经准备好的最干净基础。
+
+**v1 → v2 的代价**：5 行（v1 的 set-nil 块）+ 1 行重复 nbw 声明 = 删 6 行；v2 open 端 if nil 改成 if != nil 多 1 行。**净 +5 行左右**。
