@@ -429,12 +429,12 @@ func NotePaneSend(h *BufPane) bool {
 // locToScreenRow converts a buffer location to its screen row.
 // It correctly handles softwrap by using SLocFromLoc and Diff.
 func (n *NotePane) locToScreenRow(bw *display.BufWindow, view *display.View, loc buffer.Loc) int {
+	sloc := bw.SLocFromLoc(loc)
 	if bw.Buf.IsMD {
-		if offset, ok := bw.BufferLineToScreenOffset(loc.Y); ok {
-			return offset
+		if row, ok := bw.LineToScreenRow(sloc.Line, sloc.Row); ok {
+			return row + view.Y
 		}
 	}
-	sloc := bw.SLocFromLoc(loc)
 	row := bw.Diff(view.StartLine, sloc)
 	return row + view.Y
 }

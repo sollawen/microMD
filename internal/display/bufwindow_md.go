@@ -57,10 +57,10 @@ func hasCursorInside(seg md.Segment, cursors []*buffer.Cursor) bool {
 }
 
 // renderSegmentMD 渲染单个 MD segment 到 screen。
-// 与 renderSegmentNative 对称：纯函数，渲染 + 返回 (newVY, rowBufLines)。
+// 返回签名只返回 newVY，viewportRowmap 在渲染时直接写入。
 func (w *BufWindow) renderSegmentMD(
 	seg md.Segment, vY int,
-) (newVY int, rowBufLines []int) {
+) (newVY int) {
 	bufWidth := w.bufWidth
 	bufHeight := w.bufHeight
 
@@ -71,6 +71,9 @@ func (w *BufWindow) renderSegmentMD(
 	rendered := seg.Render(seg, bufWidth, w.mdConfig)
 
 	// 绝对化 BufLine（renderer 产出相对行号，display 层统一绝对化）
+	// §4 坐标系说明：MD 渲染器内部产出的是 segment 内相对行号，
+	// renderSegmentMD:76-84 统一绝对化：row.BufLine >= 0 的 += seg.BufStartLine
+	// 装饰行（-1）不加，保持 -1
 	for ri := range rendered.Rows {
 		if rendered.Rows[ri].BufLine >= 0 {
 			rendered.Rows[ri].BufLine += seg.BufStartLine
@@ -83,9 +86,6 @@ func (w *BufWindow) renderSegmentMD(
 	}
 
 	// ★ lineStyles 预计算：覆盖完整范围 BufStartLine~BufEndLine
-	// 不能缩小到 VisibleStart~VisibleEnd，因为被跳过的行中的 cell.BufLine
-	// 仍可能被后续渲染逻辑引用（虽然当前不会渲染到屏幕，但保持数据完整性）
-	// 性能影响可忽略：多算几行 style 的开销远小于渲染本身
 	lineStyles := map[int][]tcell.Style{}
 	for bufLine := seg.BufStartLine; bufLine <= seg.BufEndLine; bufLine++ {
 		line := w.Buf.Line(bufLine)
@@ -102,15 +102,16 @@ func (w *BufWindow) renderSegmentMD(
 		}
 	}
 
-	// ★ 写入 screen：根据 VisibleStart/VisibleEnd 过滤
+	// ★ 写入 screen + viewportRowmap：根据 VisibleStart/VisibleEnd 过滤
 	lastBufLine := -1
 	lastContentBufLine := -1 // 追踪最近的内容行，用于装饰行可见性判断
+	segRow := 0              // segmentRow：同一 buffer 行的第几个 softwrap 段
 	for _, row := range rendered.Rows {
 		if vY >= bufHeight {
 			break
 		}
 
-		// 可见性判断
+		// 可见性判断（用于决定是否渲染，不影响 viewportRowmap 写入）
 		effectiveLine := row.BufLine
 		if effectiveLine < 0 {
 			if lastContentBufLine >= 0 {
@@ -128,8 +129,19 @@ func (w *BufWindow) renderSegmentMD(
 			continue
 		}
 
-		// ★ 记录每个 screen row 的 BufLine（用于 click 坐标映射）
-		rowBufLines = append(rowBufLines, effectiveLine)
+		// ★ 直接写 viewportRowmap（用 row.BufLine，非 effectiveLine）
+		// effectiveLine 逻辑仅用于可见性判断
+		if vY >= 0 && vY < bufHeight {
+			if row.BufLine < 0 {
+				w.viewportRowmap[vY] = SLoc{Line: -1, Row: -1} // 装饰行
+			} else if row.BufLine == lastBufLine {
+				segRow++ // 同一 buffer 行的续段
+				w.viewportRowmap[vY] = SLoc{Line: row.BufLine, Row: segRow}
+			} else {
+				segRow = 0 // 新 buffer 行
+				w.viewportRowmap[vY] = SLoc{Line: row.BufLine, Row: 0}
+			}
+		}
 
 		// 更新追踪
 		if row.BufLine >= 0 {
@@ -149,7 +161,6 @@ func (w *BufWindow) renderSegmentMD(
 			}
 			style := cell.Style
 			// 确保背景色：如果 cell 没有设置背景色，使用 DefStyle 的背景色
-			// 这样渲染器的 padding cell 在 light theme 下也能正确显示背景
 			_, bg, _ := style.Decompose()
 			if bg == tcell.ColorDefault {
 				_, defBg, _ := config.DefStyle.Decompose()
@@ -187,7 +198,7 @@ func (w *BufWindow) renderSegmentMD(
 		vY++
 	}
 
-	return vY, rowBufLines
+	return vY
 }
 
 
@@ -195,15 +206,12 @@ func (w *BufWindow) renderSegmentMD(
 // renderSegmentNative 用原生逻辑渲染一个 segment 到 BufWindow。
 // seg 必须已经过 filterSegmentsToVisible 裁剪（BufStartLine/BufEndLine 在可见区内）。
 // 不修改 displayBuffer()，从那里复制主循环并按需调整。
-//
-// startVY : 起始 screen 行（相对窗口顶部）
-// 返回:
-//   newVY         - 渲染后的 vY（=startVY + 实际消耗的 screen 行数）
-//   rowBufLines   - 每个 screen row 的 BufLine（装饰行 = -1）
+// 返回签名只返回 newVY，viewportRowmap 在渲染时直接写入。
 func (w *BufWindow) renderSegmentNative(
 	seg md.Segment, startVY int,
-) (newVY int, rowBufLines []int) {
+) (newVY int) {
 	b := w.Buf
+	bufHeight := w.bufHeight
 
 	maxWidth := w.gutterOffset + w.bufWidth
 
@@ -665,9 +673,13 @@ func (w *BufWindow) renderSegmentNative(
 			draw(drawrune, nil, drawstyle, true, true, preservebg)
 		}
 
-		// ★ 记录每个 screen row 的 BufLine（用于 click 坐标映射）
+		// ★ 直接写 viewportRowmap（§5.2 segmentRow 公式）
+		// 不需要 rowOffset 分支：vloc.Y -= w.StartLine.Row 让 lineStartVY 可能为负，
+		// screenRow - lineStartVY 天然从 StartLine.Row 开始
 		for screenRow := lineStartVY; screenRow <= vloc.Y; screenRow++ {
-			rowBufLines = append(rowBufLines, bloc.Y)
+			if screenRow >= 0 && screenRow < bufHeight {
+				w.viewportRowmap[screenRow] = SLoc{Line: bloc.Y, Row: screenRow - lineStartVY}
+			}
 		}
 
 		bloc.X = w.StartCol
@@ -679,7 +691,7 @@ func (w *BufWindow) renderSegmentNative(
 		}
 	}
 
-	return vloc.Y, rowBufLines
+	return vloc.Y
 }
 
 // displayBufferMD 是 displayBuffer 的 MD 渲染版本。
@@ -703,13 +715,13 @@ func (w *BufWindow) displayBufferMD(editMode bool) {
 	}
 
 	// 懒分配：确保容量足够（resize 后 bufHeight 可能变化）
-	if cap(w.viewportRowBufLine) < bufHeight {
-		w.viewportRowBufLine = make([]int, bufHeight)
+	if cap(w.viewportRowmap) < bufHeight {
+		w.viewportRowmap = make([]SLoc, bufHeight)
 	}
-	w.viewportRowBufLine = w.viewportRowBufLine[:bufHeight]
-	// 重置为 -2
-	for i := range w.viewportRowBufLine {
-		w.viewportRowBufLine[i] = -2
+	w.viewportRowmap = w.viewportRowmap[:bufHeight]
+	// 重置为 {Line:-2}（空白）
+	for i := range w.viewportRowmap {
+		w.viewportRowmap[i] = SLoc{Line: -2}
 	}
 
 	// 读 buffer 上的分类结果（事件驱动算好，content-static）
@@ -719,19 +731,16 @@ func (w *BufWindow) displayBufferMD(editMode bool) {
 
 	cursors := b.GetCursors()
 
+
 	// 2. 渲染管线主循环
 	vY := 0 // 当前 screen 行（相对窗口顶部）
 
 	for _, seg := range segments {
-		var rowBufLines []int
 		if editMode && hasCursorInside(seg, cursors) {
-			vY, rowBufLines = w.renderSegmentNative(seg, vY)
+			vY = w.renderSegmentNative(seg, vY)
 		} else {
-			vY, rowBufLines = w.renderSegmentMD(seg, vY)
+			vY = w.renderSegmentMD(seg, vY)
 		}
-		// ★ 写入扁平数组
-		startVY := vY - len(rowBufLines)
-		copy(w.viewportRowBufLine[startVY:vY], rowBufLines)
 	}
 
 	// 3. 填充剩余空间
@@ -825,29 +834,93 @@ func (w *BufWindow) expandLineStyles(bufLine int, runeCount int, baseStyle tcell
 	return charStyles
 }
 
-// screenOffsetToBufferLine 将屏幕行偏移（相对 viewport 顶部）映射为 buffer 行号。
-// 使用 viewportRowBufLine 直接查找，O(1)。
+// ScreenRowToLine 将屏幕行偏移（相对 viewport 顶部）映射为 buffer 行号。
+// 使用 viewportRowmap 直接查找，O(1)。
 // 装饰行（-1）和空白区域（-2）一视同仁：点击装饰行等于点击空白，返回 (0, false)。
 // 返回 (bufferLine, true) 表示成功映射，(0, false) 表示应回退原始 Scroll 逻辑。
-func (w *BufWindow) screenOffsetToBufferLine(screenOffset int) (int, bool) {
-	if screenOffset < 0 || screenOffset >= len(w.viewportRowBufLine) {
+func (w *BufWindow) ScreenRowToLine(screenOffset int) (int, bool) {
+	if screenOffset < 0 || screenOffset >= len(w.viewportRowmap) {
 		return 0, false
 	}
-	if w.viewportRowBufLine[screenOffset] >= 0 {
-		return w.viewportRowBufLine[screenOffset], true
+	if w.viewportRowmap[screenOffset].Line >= 0 {
+		return w.viewportRowmap[screenOffset].Line, true
 	}
 	// 装饰行（-1）和空白区域（-2）一视同仁：没有对应 buffer 行
 	return 0, false
 }
 
-// BufferLineToScreenOffset 将 buffer 行号映射为 viewport 中对应的最后一个屏幕行。
-// 倒序遍历，第一个命中就是最大的 row。
-// 返回 (screenRow, true) 表示成功映射，(0, false) 表示该 buffer 行不在 viewport 内。
-func (w *BufWindow) BufferLineToScreenOffset(bufferLine int) (int, bool) {
-	for i := len(w.viewportRowBufLine) - 1; i >= 0; i-- {
-		if w.viewportRowBufLine[i] == bufferLine {
+// LineToScreenRow 将 (bufferLine, segmentRow) 二元组精确匹配为屏行。
+// 用于 Relocate 滚动判定。线性扫描 O(bufHeight)，bufHeight 通常 ≤ 终端高度。
+func (w *BufWindow) LineToScreenRow(line, row int) (int, bool) {
+	for i, v := range w.viewportRowmap {
+		if v.Line == line && v.Row == row {
 			return i, true
 		}
 	}
 	return 0, false
+}
+
+// relocateVerticalMD 是 Relocate 的 MD 垂直滚动分支。
+// 判定：LineToScreenRow 精确匹配光标 (Line, Row) → 屏行。
+// 动作：向下读 viewportRowmap[delta]（含 segmentRow），向上沿用原生算术。
+// 边界场景（首帧 / 光标跳出视口 / delta 落空白尾）走 relocateVerticalNativeFallback。
+func (w *BufWindow) relocateVerticalMD(c SLoc, scrollmargin, height int) bool {
+	n := len(w.viewportRowmap)
+	if n == 0 {
+		return w.relocateVerticalNativeFallback(c, scrollmargin, height) // 首帧
+	}
+	cursorRow, ok := w.LineToScreenRow(c.Line, c.Row)
+	if !ok {
+		return w.relocateVerticalNativeFallback(c, scrollmargin, height) // 光标跳出视口
+	}
+
+	botMarginRow := height - 1 - scrollmargin
+	if cursorRow > botMarginRow {
+		delta := cursorRow - botMarginRow
+		if delta >= n {
+			return w.relocateVerticalNativeFallback(c, scrollmargin, height)
+		}
+		loc := w.viewportRowmap[delta]
+		// delta 落装饰/空白：向下找首个内容行作为新视口顶
+		for loc.Line < 0 && delta+1 < n {
+			delta++
+			loc = w.viewportRowmap[delta]
+		}
+		if loc.Line < 0 {
+			return w.relocateVerticalNativeFallback(c, scrollmargin, height)
+		}
+		w.StartLine = loc
+		return true
+	}
+	if cursorRow < scrollmargin {
+		w.StartLine = w.Scroll(c, -scrollmargin) // 向上：段内 1:1
+		return true
+	}
+	return true
+}
+
+// relocateVerticalNativeFallback 复刻 micro 原生垂直 Relocate（1:1 假设），
+// 供 MD 路径边界场景兜底。
+//
+// ⚠️ 此函数需与 bufwindow.go 中 Relocate 的非 MD 分支保持同步。
+// micro 的 Relocate 垂直逻辑历史稳定，但修改其 else 分支时务必同步本函数。
+func (w *BufWindow) relocateVerticalNativeFallback(c SLoc, scrollmargin, height int) bool {
+	bStart := SLoc{0, 0}
+	bEnd := w.SLocFromLoc(w.Buf.End())
+	ret := false
+	if c.LessThan(w.Scroll(w.StartLine, scrollmargin)) && c.GreaterThan(w.Scroll(bStart, scrollmargin-1)) {
+		w.StartLine = w.Scroll(c, -scrollmargin)
+		ret = true
+	} else if c.LessThan(w.StartLine) {
+		w.StartLine = c
+		ret = true
+	}
+	if c.GreaterThan(w.Scroll(w.StartLine, height-1-scrollmargin)) && c.LessEqual(w.Scroll(bEnd, -scrollmargin)) {
+		w.StartLine = w.Scroll(c, -height+1+scrollmargin)
+		ret = true
+	} else if c.GreaterThan(w.Scroll(bEnd, -scrollmargin)) && c.GreaterThan(w.Scroll(w.StartLine, height-1)) {
+		w.StartLine = w.Scroll(bEnd, -height+1)
+		ret = true
+	}
+	return ret
 }

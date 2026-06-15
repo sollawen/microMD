@@ -1,12 +1,24 @@
 ---
 name: commit
-description: Git commit with Conventional Commits prefix. Use "commit all" to stage and commit all changes.
+description: Handles git commit operations. Use when user explicitly asks to commit code changes.
 ---
 
-# Git Commit
-
 ## Rules
-- 只有用户明确命令commit的时候才执行。LLM不要自己决定执行commit
-- Every commit MUST have a Conventional Commits prefix: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `chore:`, `ci:`, `revert:`, etc.
-- Title in **English**, body is up to LLM
-- commit结束后，禁止自动 `git push`
+
+### Principles
+- Only commit when user explicitly requests it. Never auto-commit.
+- When user says "commit all", stage and commit all modified files together in one commit.
+- Do NOT push after commit. Leave that to the user.
+
+### Requirements
+
+#### title
+- Use English
+- Follow GitHub conventional commit prefixes:
+  - `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `chore:`, etc.
+
+
+#### message body
+- Mix Chinese and English
+- Technical terms in English (e.g., `PR`, `branch`, `commit`, `merge`)
+

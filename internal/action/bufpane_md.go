@@ -1,9 +1,6 @@
 package action
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/micro-editor/tcell/v2"
 	"github.com/micro-editor/micro/v2/internal/buffer"
 	"github.com/micro-editor/micro/v2/internal/config"
@@ -18,20 +15,6 @@ import (
 func initMDConfig(buf *buffer.Buffer, w *display.BufWindow) {
 	if !buf.IsMD { // 单一真源（NewBuffer 算了 IsMarkdownFile）
 		return
-	}
-
-	// 调试日志：检查 config.Colorscheme 是否已初始化
-	if f, err := os.OpenFile("/tmp/microNeo-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
-		fmt.Fprintf(f, "=== initMDConfig ===\n")
-		fmt.Fprintf(f, "config.DefStyle: %v\n", config.DefStyle)
-		fmt.Fprintf(f, "config.Colorscheme nil: %v, len: %d\n", config.Colorscheme == nil, len(config.Colorscheme))
-		for k, v := range config.Colorscheme {
-			if k == "special" || k == "default" {
-				fg, bg, attrs := v.Decompose()
-				fmt.Fprintf(f, "  config.Colorscheme[%q]: fg=%v bg=%v bold=%v\n", k, fg, bg, attrs&tcell.AttrBold != 0)
-			}
-		}
-		f.Close()
 	}
 
 	w.SetMDConfig(md.MDConfig{

@@ -4,6 +4,7 @@
 micro
 micro.exe
 microneo
+microneo-debug
 !cmd/micro
 binaries/
 tmp.sh

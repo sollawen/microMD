@@ -705,9 +705,10 @@ func makeTableBottomBorder(colWidths []int, width int, style tcell.Style, spaceS
 
 // makeTableSeparator 生成 ├─┼─┤ 分隔线
 // 表格右边界处画 ┤，右侧补空格到 width。
-func makeTableSeparator(colWidths []int, width int, style tcell.Style, spaceStyle tcell.Style) RenderedRow {
+// bufLine 参数：header 分隔线传 pt.sepIdx（对应 buffer 行），行间分隔线传 -1（纯装饰）。
+func makeTableSeparator(colWidths []int, width int, style tcell.Style, spaceStyle tcell.Style, bufLine int) RenderedRow {
 	row := RenderedRow{
-		BufLine: -1,
+		BufLine: bufLine,
 		Cells:   make([]Cell, 0, width),
 	}
 
@@ -821,7 +822,8 @@ func RenderTable(seg Segment, width int, cfg MDConfig) *RenderedSegment {
 		assembleRow(headerRow, maxH, colWidths, pt.sepIdx-1, contentStyle.Bold(true), borderStyle, width)...)
 
 	// 6. 分隔线（header 和 body 之间必有）
-	result.Rows = append(result.Rows, makeTableSeparator(colWidths, width, borderStyle, contentStyle))
+	// header 分隔线对应 buffer 行 pt.sepIdx
+	result.Rows = append(result.Rows, makeTableSeparator(colWidths, width, borderStyle, contentStyle, pt.sepIdx))
 
 	// 7. Body 行（行间插分隔线）
 	for bodyIdx, bodyCells := range pt.body {
@@ -832,8 +834,9 @@ func RenderTable(seg Segment, width int, cfg MDConfig) *RenderedSegment {
 		result.Rows = append(result.Rows,
 			assembleRow(rowRc, maxH, colWidths, bufLine, contentStyle, borderStyle, width)...)
 		// 行间分隔线（最后一行不画，底边框会兜底；无边框时也画，保持行间分隔）
+		// 行间分隔线是纯装饰，无对应 buffer 行
 		if bodyIdx < len(pt.body)-1 {
-			result.Rows = append(result.Rows, makeTableSeparator(colWidths, width, borderStyle, contentStyle))
+			result.Rows = append(result.Rows, makeTableSeparator(colWidths, width, borderStyle, contentStyle, -1))
 		}
 	}
 
