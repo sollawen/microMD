@@ -246,7 +246,7 @@ func (w *BufWindow) Relocate() bool {
 	bEnd := w.SLocFromLoc(b.End())
 
 	// MicroNeo: MD 走 row 判定（实质逻辑见 bufwindow_md.go），非 MD 走 micro 原生。
-	if w.Buf.IsMD && w.mdConfig.MDRender {
+	if w.Buf.IsMD {
 		ret = w.relocateVerticalMD(c, scrollmargin, height)
 	} else {
 		if c.LessThan(w.Scroll(w.StartLine, scrollmargin)) && c.GreaterThan(w.Scroll(bStart, scrollmargin-1)) {
@@ -296,7 +296,7 @@ func (w *BufWindow) LocFromVisual(svloc buffer.Loc) buffer.Loc {
 	}
 
 	var sloc SLoc
-	if w.Buf.IsMD && w.mdConfig.MDRender {
+	if w.Buf.IsMD {
 		// MicroNeo: 使用 viewportRowmap 将屏幕 Y 偏移映射到 buffer 行
 		if bufLine, ok := w.screenRowToLine(svloc.Y - w.Y); ok {
 			sloc = SLoc{bufLine, 0} // 非softwrap模式下 Row=0
@@ -934,7 +934,7 @@ func (w *BufWindow) Display() {
 
 	w.displayStatusLine()
 	w.displayScrollBar()
-	if !w.Buf.IsMD || !w.mdConfig.MDRender {
+	if !w.Buf.IsMD {
 		w.displayBuffer()
 	} else {
 		w.displayBufferMD(w.editMode)
